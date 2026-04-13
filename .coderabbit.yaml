@@ -1,0 +1,20 @@
+# .coderabbit.yaml
+language: "ko"              # 리뷰 언어 설정 (한국어)
+reviews:
+  profile: "assertive"      # chill | assertive (피드백 강도)
+  request_changes_workflow: false
+  high_level_summary: true  # PR 요약 활성화
+  poem: false               # 리뷰 끝 시 비활성화
+  review_status: true
+
+# 특정 경로 제외
+path_filters:
+  - "!**/*.lock"
+  - "!**/migrations/**"
+  - "!**/__generated__/**"
+
+# 커스텀 리뷰 지침
+instructions: |
+  - Spring Boot 코드 리뷰 시 트랜잭션 경계를 반드시 확인하세요
+  - 결제 관련 코드에서는 멱등성 처리 여부를 최우선으로 검토하세요
+  - @Transactional 어노테이션 남용 여부를 체크하세요
