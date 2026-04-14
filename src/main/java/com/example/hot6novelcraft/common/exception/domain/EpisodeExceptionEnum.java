@@ -13,6 +13,7 @@ public enum EpisodeExceptionEnum implements ErrorCode {
     EPISODE_NUMBER_DUPLICATE(HttpStatus.BAD_REQUEST, "이미 존재하는 회차 번호입니다."),
     EPISODE_ALREADY_PUBLISHED(HttpStatus.BAD_REQUEST, "이미 발행된 회차입니다."),
     EPISODE_NUMBER_NOT_SEQUENTIAL(HttpStatus.BAD_REQUEST, "회차 번호는 순서대로 등록해야 합니다."),
+    EPISODE_DELETE_NOT_LAST(HttpStatus.BAD_REQUEST, "마지막 회차만 삭제할 수 있습니다."),
     EPISODE_CONTENT_EMPTY(HttpStatus.BAD_REQUEST, "본문 내용이 없는 회차는 발행할 수 없습니다.");
 
     private final HttpStatus httpStatus;

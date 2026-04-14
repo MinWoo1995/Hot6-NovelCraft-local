@@ -6,6 +6,7 @@ import com.example.hot6novelcraft.common.exception.domain.NovelExceptionEnum;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeCreateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeUpdateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeCreateResponse;
+import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeDeleteResponse;
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeUpdateResponse;
 import com.example.hot6novelcraft.domain.episode.entity.Episode;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
@@ -34,12 +35,12 @@ public class EpisodeService {
         // 소설 조회
         findNovelById(novelId);
 
-        // 회차 번호 중복 확인
-        if (episodeRepository.existsByNovelIdAndEpisodeNumber(novelId, request.episodeNumber())) {
+        // 회차 번호 중복 확인(삭제된 회차 제외)
+        if (episodeRepository.existsByNovelIdAndEpisodeNumberAndIsDeletedFalse(novelId, request.episodeNumber())) {
             throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NUMBER_DUPLICATE);
         }
         // 회차 번호 순서 검증 (ex : 1,2,3 ...10)
-        int lastEpisodeNumber = episodeRepository.countByNovelId(novelId);
+        int lastEpisodeNumber = episodeRepository.countByNovelIdAndIsDeletedFalse(novelId);
         if (request.episodeNumber() != lastEpisodeNumber + 1) {
             throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NUMBER_NOT_SEQUENTIAL);
         }
@@ -76,6 +77,27 @@ public class EpisodeService {
         episode.update(request.title(), request.content());
 
         return EpisodeUpdateResponse.from(episode.getId());
+    }
+
+    // 회차 삭제
+    @Transactional
+    public EpisodeDeleteResponse deleteEpisode(Long episodeId) {
+
+        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
+
+        // 회차 조회
+        Episode episode = findEpisodeById(episodeId);
+
+        // 마지막 회차만 삭제 가능
+        if (episodeRepository.existsByNovelIdAndEpisodeNumberGreaterThanAndIsDeletedFalse(
+                episode.getNovelId(), episode.getEpisodeNumber())) {
+            throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_DELETE_NOT_LAST);
+        }
+
+        // 회차 삭제 (소프트 딜리트)
+        episode.delete();
+
+        return EpisodeDeleteResponse.from(episode.getId());
     }
 
     // 소설 조회 공통 메서드

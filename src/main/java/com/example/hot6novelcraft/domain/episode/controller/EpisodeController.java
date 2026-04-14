@@ -4,6 +4,7 @@ import com.example.hot6novelcraft.common.dto.BaseResponse;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeCreateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeUpdateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeCreateResponse;
+import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeDeleteResponse;
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeUpdateResponse;
 import com.example.hot6novelcraft.domain.episode.service.EpisodeService;
 import jakarta.validation.Valid;
@@ -49,6 +50,21 @@ public class EpisodeController {
 
         return ResponseEntity.ok(
                 BaseResponse.success("200", "회차 수정 성공", response)
+        );
+    }
+
+    /**
+     * 회차 삭제
+     * 정은식
+     */
+    @DeleteMapping("/episodes/{episodeId}")
+    public ResponseEntity<BaseResponse<EpisodeDeleteResponse>> deleteEpisode(
+            @PathVariable Long episodeId
+    ) {
+        EpisodeDeleteResponse response = episodeService.deleteEpisode(episodeId);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "회차 삭제 성공", response)
         );
     }
 }
