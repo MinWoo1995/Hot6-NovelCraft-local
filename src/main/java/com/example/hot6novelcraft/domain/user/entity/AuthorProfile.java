@@ -1,10 +1,9 @@
 package com.example.hot6novelcraft.domain.user.entity;
 
 import com.example.hot6novelcraft.common.entity.BaseEntity;
-import com.example.hot6novelcraft.common.exception.ServiceErrorException;
-import com.example.hot6novelcraft.common.exception.domain.UserExceptionEnum;
-import com.example.hot6novelcraft.domain.user.entity.userEnum.CareerLevel;
+import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,6 +12,8 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "author_profiles")
 public class AuthorProfile extends BaseEntity {
@@ -51,37 +52,26 @@ public class AuthorProfile extends BaseEntity {
 
     private LocalDateTime deletedAt;
 
-    private AuthorProfile(
-            Long userId
-            , String bio
-            , CareerLevel careerLevel
-            , String mainGenre
-            , String instagramLinks
-            , String xLinks
-            , String blogLinks
-            , boolean allowMenteeRequest
-    ) {
-        this.userId = userId;
-        this.bio = bio;
-        this.careerLevel = careerLevel;
-        this.mainGenre = mainGenre;
-        this.instagramLinks = instagramLinks;
-        this.xLinks = xLinks;
-        this.blogLinks = blogLinks;
-        this.allowMenteeRequest = allowMenteeRequest;
+    @PreUpdate
+    protected void preUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
-    @Builder
-    public static AuthorProfile register(
-            Long userId
-            , String bio
-            , CareerLevel careerLevel
-            , String mainGenre
-            , String instagramLinks
-            , String xLinks
-            , String blogLinks
-            , boolean allowMenteeRequest
-    ){
-        return new AuthorProfile(userId, bio, careerLevel, mainGenre, instagramLinks, xLinks, blogLinks, allowMenteeRequest);
+    @PreRemove
+    protected void preRemove() {
+        deletedAt = LocalDateTime.now();
+    }
+
+    public static AuthorProfile register(Long userId, String bio, CareerLevel careerLevel, String mainGenre, String instagramLinks, String xLinks, String blogLinks, boolean allowMenteeRequest) {
+        return AuthorProfile.builder()
+                .userId(userId)
+                .bio(bio)
+                .careerLevel(careerLevel)
+                .mainGenre(mainGenre)
+                .instagramLinks(instagramLinks)
+                .xLinks(xLinks)
+                .blogLinks(blogLinks)
+                .allowMenteeRequest(allowMenteeRequest)
+                .build();
     }
 }

@@ -1,18 +1,18 @@
 package com.example.hot6novelcraft.domain.user.entity;
 
 import com.example.hot6novelcraft.common.entity.BaseEntity;
-import com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole;
+import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import jakarta.persistence.*;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@NoArgsConstructor
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "users")
 public class User extends BaseEntity {
 
@@ -52,31 +52,25 @@ public class User extends BaseEntity {
         updatedAt = LocalDateTime.now();
     }
 
-    private User(String email, String password, String nickname, String phoneNo, LocalDate birthday, UserRole role) {
-        this.email = email;
-        this.password = password;
-        this.nickname = nickname;
-        this.phoneNo = phoneNo;
-        this.birthday = birthday;
-        this.role = role;
+    @PreRemove
+    protected void preRemove() {
+        deletedAt = LocalDateTime.now();
     }
 
-    @Builder
     public static User register(String email, String password, String nickname, String phoneNo, LocalDate birthday, UserRole role) {
-        return new User(email, password, nickname, phoneNo, birthday, role);
+        return User.builder()
+                .email(email)
+                .password(password)
+                .nickname(nickname)
+                .phoneNo(phoneNo)
+                .birthday(birthday)
+                .role(role)
+                .build();
     }
 
     // 관리자 전용 메서드
-    private User(String email, String password, String phoneNo, UserRole role) {
-        this.email = email;
-        this.password = password;
-        this.phoneNo = phoneNo;
-        this.role = role;
-    }
-
-    @Builder
     public static User registerAdmin(String email, String password, String phoneNo, UserRole role) {
-        return new User(
+        return User.register(
                 email,
                 password,
                 "ADMIN_" + email,
