@@ -51,7 +51,9 @@ public class SecurityConfig {
                         , "/static/**"
                         , "/css/**"
                         , "/js/**"
-                        , "/images/**").permitAll()
+                        , "/images/**"
+                        ).permitAll()
+                                .requestMatchers("/api/calendars/**").hasAnyAuthority("READER", "AUTHOR")
                 .anyRequest().authenticated()
                 )
                 .build();
