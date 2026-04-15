@@ -43,7 +43,6 @@ public class AuthorProfile extends BaseEntity {
     @Column(length = 500)
     private String blogLinks;
 
-    @Column(nullable = false)
     private boolean allowMenteeRequest;
 
     @Column(nullable = false)
