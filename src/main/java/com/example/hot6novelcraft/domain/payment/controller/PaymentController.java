@@ -11,7 +11,10 @@ import com.example.hot6novelcraft.domain.payment.dto.response.PaymentResponse;
 import com.example.hot6novelcraft.domain.payment.service.PaymentService;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -20,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+@Validated
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
@@ -34,11 +38,11 @@ public class PaymentController {
     @GetMapping
     public ResponseEntity<BaseResponse<PageResponse<PaymentHistoryResponse>>> getPaymentHistory(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "0") @Min(1) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size
     ) {
         Long userId = userDetails.getUser().getId();
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         PageResponse<PaymentHistoryResponse> response = paymentService.getPaymentHistory(userId, pageable);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(BaseResponse.success(HttpStatus.OK.name(), "결제 내역 조회 성공", response));
