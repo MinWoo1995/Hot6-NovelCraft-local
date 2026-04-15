@@ -6,6 +6,8 @@ import com.example.hot6novelcraft.domain.calendar.dto.*;
 import com.example.hot6novelcraft.domain.calendar.service.CalendarService;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -13,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
@@ -20,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/calendars")
 @RequiredArgsConstructor
+@Validated
 public class CalendarController {
 
     private final CalendarService calendarService;
@@ -67,8 +71,8 @@ public class CalendarController {
     @GetMapping("/me/statistics")
     public ResponseEntity<BaseResponse<MonthlyStatResponse>> getMonthlyStatistics(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @RequestParam int year,
-            @RequestParam int month
+            @RequestParam @Min(2000) int year,               // 연도 최소값 제한
+            @RequestParam @Min(1) @Max(12) int month         // 1~12월 범위 제한
     ) {
         Long userId = userDetails.getUser().getId();
         MonthlyStatResponse response = calendarService.getMonthlyStatistics(userId, year, month);
