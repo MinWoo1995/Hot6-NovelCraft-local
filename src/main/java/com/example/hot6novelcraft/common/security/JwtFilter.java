@@ -42,7 +42,9 @@ public class JwtFilter extends OncePerRequestFilter {
                     "/api/auth/signup"
                     ,"/api/auth/login"
                     , "/api/auth/email/check"
-                    , "/api/auth/nickname/check");
+                    , "/api/auth/nickname/check"
+                    , "/api/auth/phone/send"
+                    , "/api/auth/phone/verify");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
