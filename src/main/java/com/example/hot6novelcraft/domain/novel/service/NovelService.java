@@ -56,7 +56,7 @@ public class NovelService {
 
         // 작가 권한 확인
         if (user.getRole() != UserRole.AUTHOR) {
-            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_FORBIDDEN);
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_AUTHOR_FORBIDDEN);
         }
 
         // 소설 조회 공통 메서드(본인 소설 및 삭제여부)
@@ -82,7 +82,7 @@ public class NovelService {
 
         // 작가 권한 확인
         if (user.getRole() != UserRole.AUTHOR) {
-            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_FORBIDDEN);
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_AUTHOR_FORBIDDEN);
         }
 
         // 소설 조회 공통 메서드(본인 소설 및 삭제여부)
