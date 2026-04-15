@@ -1,7 +1,7 @@
 package com.example.hot6novelcraft.domain.user.entity;
 
 import com.example.hot6novelcraft.common.entity.BaseEntity;
-import com.example.hot6novelcraft.domain.novel.entity.MainGenre;
+import com.example.hot6novelcraft.domain.user.entity.userEnum.CareerLevel;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -30,8 +30,7 @@ public class AuthorProfile extends BaseEntity {
     private CareerLevel careerLevel;
 
     @Column(nullable = false)
-    @Enumerated(EnumType.STRING)
-    private MainGenre mainGenre;
+    private String mainGenre;
 
     @Column(length = 500)
     private String instagramLinks;
@@ -50,7 +49,16 @@ public class AuthorProfile extends BaseEntity {
 
     private LocalDateTime deletedAt;
 
-    private AuthorProfile (Long userId,String bio,CareerLevel careerLevel, MainGenre mainGenre,String instagramLinks, String xLinks, String blogLinks, boolean allowMenteeRequest) {
+    private AuthorProfile(
+            Long userId
+            , String bio
+            , CareerLevel careerLevel
+            , String mainGenre
+            , String instagramLinks
+            , String xLinks
+            , String blogLinks
+            , boolean allowMenteeRequest
+    ) {
         this.userId = userId;
         this.bio = bio;
         this.careerLevel = careerLevel;
@@ -62,7 +70,16 @@ public class AuthorProfile extends BaseEntity {
     }
 
     @Builder
-    public static AuthorProfile register (Long userId,String bio,CareerLevel careerLevel, MainGenre mainGenre,String instagramLinks, String xLinks, String blogLinks, boolean allowMenteeRequest){
+    public static AuthorProfile register(
+            Long userId
+            , String bio
+            , CareerLevel careerLevel
+            , String mainGenre
+            , String instagramLinks
+            , String xLinks
+            , String blogLinks
+            , boolean allowMenteeRequest){
+
         return new AuthorProfile(userId, bio, careerLevel, mainGenre, instagramLinks, xLinks, blogLinks, allowMenteeRequest);
     }
 }
