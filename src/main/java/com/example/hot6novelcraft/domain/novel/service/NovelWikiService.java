@@ -6,6 +6,7 @@ import com.example.hot6novelcraft.common.exception.domain.NovelWikiExceptionEnum
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelWikiCreateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelWikiCreateResponse;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelWikiDeleteResponse;
+import com.example.hot6novelcraft.domain.novel.dto.response.NovelWikiResponse;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.entity.NovelWiki;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
@@ -13,17 +14,25 @@ import com.example.hot6novelcraft.domain.novel.repository.NovelWikiRepository;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class NovelWikiService {
 
+    private static final String WIKI_CACHE_KEY = "wiki::";
+    private static final Duration WIKI_CACHE_TTL = Duration.ofHours(1); // 1시간
+
     private final NovelWikiRepository novelWikiRepository;
     private final NovelRepository novelRepository;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     // 설정집 저장
     @Transactional
@@ -45,6 +54,9 @@ public class NovelWikiService {
 
         NovelWiki savedWiki = novelWikiRepository.save(wiki);
 
+        // 캐시 무효화
+        redisTemplate.delete(WIKI_CACHE_KEY + novelId);
+
         return NovelWikiCreateResponse.from(savedWiki.getId());
     }
 
@@ -65,7 +77,43 @@ public class NovelWikiService {
         // 설정집 삭제 (하드딜리트)
         novelWikiRepository.delete(wiki);
 
+        // 캐시 무효화
+        redisTemplate.delete(WIKI_CACHE_KEY + novelId);
+
         return NovelWikiDeleteResponse.from(wikiId);
+    }
+
+    // 설정집 조회 (Redis 캐싱)
+    @Transactional(readOnly = true)
+    public List<NovelWikiResponse> getWikiList(Long novelId, UserDetailsImpl userDetails) {
+
+        // 작가 권한 확인
+        validateAuthorRole(userDetails);
+
+        // 소설 조회 (본인 소설 및 삭제여부)
+        findNovelById(novelId, userDetails.getUser().getId());
+
+        // Redis 캐시 확인
+        String cacheKey = WIKI_CACHE_KEY + novelId;
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+
+
+        if (cached != null) {
+            return (List<NovelWikiResponse>) cached;
+        }
+
+        // DB 조회 (QueryDSL)
+        List<NovelWiki> wikiList = novelWikiRepository.findAllByNovelId(novelId);
+
+        // Response 변환
+        List<NovelWikiResponse> response = wikiList.stream()
+                .map(NovelWikiResponse::from)
+                .collect(Collectors.toList());
+
+        // Redis 캐싱
+        redisTemplate.opsForValue().set(cacheKey, response, WIKI_CACHE_TTL);
+
+        return response;
     }
 
     // 작가 권한 확인 공통 메서드

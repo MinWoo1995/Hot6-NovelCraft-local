@@ -13,7 +13,8 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "novel_wiki")
+@Table(name = "novel_wiki",
+        indexes = @Index(name = "idx_wiki_novel_id", columnList = "novel_id"))
 public class NovelWiki extends BaseEntity {
 
     @Id
@@ -31,18 +32,6 @@ public class NovelWiki extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String content;
-
-    private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 
     // 설정집 생성
     public static NovelWiki createWiki(Long novelId, WikiCategory category,
