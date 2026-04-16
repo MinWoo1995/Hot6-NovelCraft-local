@@ -4,10 +4,7 @@ import com.example.hot6novelcraft.common.dto.BaseResponse;
 import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelCreateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelUpdateRequest;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelCreateResponse;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelDeleteResponse;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelListResponse;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelUpdateResponse;
+import com.example.hot6novelcraft.domain.novel.dto.response.*;
 import com.example.hot6novelcraft.domain.novel.service.NovelService;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import jakarta.validation.Valid;
@@ -24,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @Validated
-@RequestMapping("/api/novels")
+@RequestMapping("/api")
 public class NovelController {
 
     private final NovelService novelService;
@@ -33,7 +30,7 @@ public class NovelController {
      * 소설 등록
      * 정은식
      */
-    @PostMapping
+    @PostMapping("/novels")
     public ResponseEntity<BaseResponse<NovelCreateResponse>> createNovel(
             @Valid @RequestBody NovelCreateRequest request,
             @AuthenticationPrincipal UserDetailsImpl userDetails
@@ -48,7 +45,7 @@ public class NovelController {
      * 소설 수정
      * 정은식
      */
-    @PatchMapping("/{novelId}")
+    @PatchMapping("/novels/{novelId}")
     public ResponseEntity<BaseResponse<NovelUpdateResponse>> updateNovel(
             @PathVariable Long novelId,
             @Valid @RequestBody NovelUpdateRequest request,
@@ -65,7 +62,7 @@ public class NovelController {
      * 소설 삭제
      * 정은식
      */
-    @DeleteMapping("/{novelId}")
+    @DeleteMapping("/novels/{novelId}")
     public ResponseEntity<BaseResponse<NovelDeleteResponse>> deleteNovel(
             @PathVariable Long novelId,
             @AuthenticationPrincipal UserDetailsImpl userDetails
@@ -81,7 +78,7 @@ public class NovelController {
      * 소설 목록 조회 V1
      * 정은식
      */
-    @GetMapping
+    @GetMapping("/v1/novels")
     public ResponseEntity<BaseResponse<PageResponse<NovelListResponse>>> getNovelListV1(
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
@@ -89,6 +86,21 @@ public class NovelController {
 
         return ResponseEntity.ok(
                 BaseResponse.success("200", "소설 목록 조회 성공(V1)", response)
+        );
+    }
+
+    /**
+     * 소설 상세 조회 V1
+     * 정은식
+     */
+    @GetMapping("/v1/novels/{novelId}")
+    public ResponseEntity<BaseResponse<NovelDetailResponse>> getNovelDetailV1(
+            @PathVariable Long novelId
+    ) {
+        NovelDetailResponse response = novelService.getNovelDetailV1(novelId);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "소설 상세 조회 성공", response)
         );
     }
 }

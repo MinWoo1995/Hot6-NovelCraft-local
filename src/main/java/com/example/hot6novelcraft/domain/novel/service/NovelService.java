@@ -6,10 +6,7 @@ import com.example.hot6novelcraft.common.exception.domain.NovelExceptionEnum;
 import com.example.hot6novelcraft.common.exception.domain.UserExceptionEnum;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelCreateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelUpdateRequest;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelCreateResponse;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelDeleteResponse;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelListResponse;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelUpdateResponse;
+import com.example.hot6novelcraft.domain.novel.dto.response.*;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
@@ -129,6 +126,27 @@ public class NovelService {
         });
 
         return PageResponse.register(response);
+    }
+
+    // 소설 상세 조회 V1(JPA)
+    @Transactional(readOnly = true)
+    public NovelDetailResponse getNovelDetailV1(Long novelId) {
+
+        // 소설 조회
+        Novel novel = novelRepository.findById(novelId)
+                .orElseThrow(() -> new ServiceErrorException(NovelExceptionEnum.NOVEL_NOT_FOUND));
+
+        // 삭제된 소설 확인
+        if (novel.isDeleted()) {
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_ALREADY_DELETED);
+        }
+
+        // 작가 닉네임 조회
+        String authorNickname = userRepository.findById(novel.getAuthorId())
+                .map(User::getNickname)
+                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+
+        return NovelDetailResponse.of(novel, authorNickname);
     }
 
     // 소설 조회 공통 메서드(본인 소설 및 삭제여부)
