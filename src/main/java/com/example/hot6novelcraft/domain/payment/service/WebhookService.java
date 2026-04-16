@@ -10,6 +10,7 @@ import com.example.hot6novelcraft.domain.webhookevent.entity.WebhookEventType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.portone.sdk.server.payment.CancelledPayment;
+import java.util.concurrent.TimeUnit;
 import io.portone.sdk.server.payment.FailedPayment;
 import io.portone.sdk.server.payment.PaidPayment;
 import io.portone.sdk.server.payment.PartialCancelledPayment;
@@ -84,7 +85,7 @@ public class WebhookService {
         // 2. 포트원 SDK 조회로 실제 결제 상태 검증 (위조 방지)
         io.portone.sdk.server.payment.Payment portOnePayment;
         try {
-            portOnePayment = paymentClient.getPayment(paymentId).get();
+            portOnePayment = paymentClient.getPayment(paymentId).get(10, TimeUnit.SECONDS);
         } catch (Exception e) {
             log.error("웹훅 처리 중 포트원 SDK 조회 실패 paymentId={}", paymentId, e);
             webhookTransactionService.markEventFailed(webhookEvent.getId(), "포트원 SDK 조회 실패: " + e.getMessage());

@@ -15,6 +15,7 @@ import com.example.hot6novelcraft.domain.point.service.PointService;
 import io.portone.sdk.server.payment.PaidPayment;
 import io.portone.sdk.server.payment.PaymentClient;
 import lombok.RequiredArgsConstructor;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -83,7 +84,7 @@ public class PaymentService {
             // 2. 포트원 V2 SDK 조회 (트랜잭션 밖 — DB 커넥션 미점유)
             log.info("[결제] 포트원 SDK 검증 시작 paymentKey={}", request.paymentId());
             io.portone.sdk.server.payment.Payment portOnePayment =
-                    paymentClient.getPayment(request.paymentId()).get();
+                    paymentClient.getPayment(request.paymentId()).get(10, TimeUnit.SECONDS);
 
             // 3. 결제 완료(PAID) 상태 확인
             if (!(portOnePayment instanceof PaidPayment paidPayment)) {
@@ -158,7 +159,7 @@ public class PaymentService {
             try {
                 // 3. 포트원 SDK 환불 요청 (트랜잭션 밖 — DB 커넥션 미점유)
                 paymentClient.cancelPayment(payment.getPaymentKey(), null, null, null,
-                        reason, null, null, null, null, null, null).get();
+                        reason, null, null, null, null, null, null).get(20, TimeUnit.SECONDS);
                 log.info("[환불] 포트원 환불 완료 paymentKey={}", payment.getPaymentKey());
             } catch (Exception e) {
                 // 보상: PortOne 실패 시 선차감한 포인트 복구
