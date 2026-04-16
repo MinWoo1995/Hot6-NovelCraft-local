@@ -1,12 +1,10 @@
 package com.example.hot6novelcraft.domain.episode.service;
 
+import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeCreateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeUpdateRequest;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeCreateResponse;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeDeleteResponse;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodePublishResponse;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeUpdateResponse;
+import com.example.hot6novelcraft.domain.episode.dto.response.*;
 import com.example.hot6novelcraft.domain.episode.entity.Episode;
 import com.example.hot6novelcraft.domain.episode.entity.enums.EpisodeStatus;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
@@ -14,7 +12,7 @@ import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
-import com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole;
+import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,11 +20,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
 
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -370,5 +373,32 @@ class EpisodeServiceTest {
 
         assertThrows(ServiceErrorException.class,
                 () -> episodeService.publishEpisode(1L, userDetails));
+    }
+
+    // ==================== 회차 목록 조회 ====================
+
+    @Test
+    void 회차목록조회_성공() {
+        Novel novel = 소설(1L);
+        Page<EpisodeListResponse> episodePage = new PageImpl<>(List.of(
+                new EpisodeListResponse(1L, 1, "1화 제목", true, 0, 150L, null),
+                new EpisodeListResponse(2L, 2, "2화 제목", true, 0, 120L, null)
+        ));
+
+        given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+        given(episodeRepository.findEpisodeListByNovelId(eq(1L), any())).willReturn(episodePage);
+
+        PageResponse<EpisodeListResponse> response = episodeService.getEpisodeList(1L, Pageable.ofSize(20));
+
+        assertNotNull(response);
+        assertEquals(2, response.content().size());
+    }
+
+    @Test
+    void 회차목록조회_소설없으면_실패() {
+        given(novelRepository.findById(1L)).willReturn(Optional.empty());
+
+        assertThrows(ServiceErrorException.class,
+                () -> episodeService.getEpisodeList(1L, Pageable.ofSize(20)));
     }
 }

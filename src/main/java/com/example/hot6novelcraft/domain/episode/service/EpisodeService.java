@@ -1,14 +1,12 @@
 package com.example.hot6novelcraft.domain.episode.service;
 
+import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.EpisodeExceptionEnum;
 import com.example.hot6novelcraft.common.exception.domain.NovelExceptionEnum;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeCreateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeUpdateRequest;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeCreateResponse;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeDeleteResponse;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodePublishResponse;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeUpdateResponse;
+import com.example.hot6novelcraft.domain.episode.dto.response.*;
 import com.example.hot6novelcraft.domain.episode.entity.Episode;
 import com.example.hot6novelcraft.domain.episode.entity.enums.EpisodeStatus;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
@@ -18,6 +16,8 @@ import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -154,6 +154,20 @@ public class EpisodeService {
             novel.changeStatus(NovelStatus.ONGOING);
         }
         return EpisodePublishResponse.from(episode.getId());
+    }
+
+    // 회차 목록 조회 (QueryDSL + 인덱싱)
+    @Transactional(readOnly = true)
+    public PageResponse<EpisodeListResponse> getEpisodeList(Long novelId, Pageable pageable) {
+
+        // 소설 존재 여부 확인
+        novelRepository.findById(novelId)
+                .orElseThrow(() -> new ServiceErrorException(NovelExceptionEnum.NOVEL_NOT_FOUND));
+
+        // 회차 목록 조회 (PUBLISHED만)
+        Page<EpisodeListResponse> episodes = episodeRepository.findEpisodeListByNovelId(novelId, pageable);
+
+        return PageResponse.register(episodes);
     }
 
 
