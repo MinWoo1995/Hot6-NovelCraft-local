@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
@@ -59,6 +60,7 @@ class WebhookConcurrencyTest {
     private static final Long WEBHOOK_EVENT_ID = 99L;
     private static final String PORTONE_PAYMENT_ID = "payment-test-abc123";
     private static final String TRANSACTION_ID = "tx-test-001";
+    private static final String MOCK_LOCK_TOKEN = "mock-lock-token";
 
     private WebhookRequest paidWebhookRequest() {
         WebhookRequest.WebhookData data = new WebhookRequest.WebhookData(
@@ -88,10 +90,10 @@ class WebhookConcurrencyTest {
     class WebhookLockConcurrencyTest {
 
         @Test
-        @DisplayName("/confirm 처리 중 웹훅 도착 시 markEventFailed 호출 후 포트원 재시도 유도")
-        void webhook_whenConfirmHoldsLock_marksEventFailed() {
+        @DisplayName("/confirm 처리 중 웹훅 도착 시 WebhookEvent를 PENDING 유지하여 포트원 재시도 유도")
+        void webhook_whenConfirmHoldsLock_returnWithoutMarkingFailed() {
             // given - /confirm이 이미 락을 보유 중인 상황
-            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(false);
+            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn((String) null);
 
             WebhookEvent event = webhookEvent(WEBHOOK_EVENT_ID);
             given(webhookTransactionService.prepareWebhookEvent(anyString(), any(), anyString(), any()))
@@ -104,7 +106,6 @@ class WebhookConcurrencyTest {
 
             Payment payment = pendingPayment();
             given(webhookTransactionService.getPaymentByKey(anyString())).willReturn(payment);
-            willDoNothing().given(webhookTransactionService).markEventFailed(anyLong(), anyString());
 
             // when
             webhookService.handleWebhook(paidWebhookRequest());
@@ -112,18 +113,16 @@ class WebhookConcurrencyTest {
             // then
             // 락을 못 얻었으므로 completePendingPayment(포인트 충전)는 실행되지 않아야 한다
             verify(webhookTransactionService, never()).completePendingPayment(any(), any(), any());
-            // 포트원이 재시도하도록 이벤트를 FAIL로 마킹해야 한다
-            verify(webhookTransactionService, times(1)).markEventFailed(
-                    WEBHOOK_EVENT_ID, "/confirm 처리 중 - 재시도 필요"
-            );
+            // WebhookEvent를 PENDING 상태로 유지 — markEventFailed 호출 없음
+            verify(webhookTransactionService, never()).markEventFailed(any(), anyString());
         }
 
         @Test
         @DisplayName("웹훅 락 획득 성공 시 completePendingPayment 정상 실행")
         void webhook_whenLockAcquired_completesPayment() {
             // given
-            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(true);
-            willDoNothing().given(redisUtil).releaseLock(anyString());
+            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(MOCK_LOCK_TOKEN);
+            willDoNothing().given(redisUtil).releaseLock(anyString(), anyString());
 
             WebhookEvent event = webhookEvent(WEBHOOK_EVENT_ID);
             given(webhookTransactionService.prepareWebhookEvent(anyString(), any(), anyString(), any()))
@@ -146,7 +145,8 @@ class WebhookConcurrencyTest {
                     .completePendingPayment(anyLong(), anyLong(), any());
             verify(webhookTransactionService, never()).markEventFailed(any(), anyString());
             // finally 블록에서 락이 반드시 해제되어야 한다
-            verify(redisUtil, times(1)).releaseLock("payment:confirm:lock:" + PORTONE_PAYMENT_ID);
+            verify(redisUtil, times(1)).releaseLock(
+                    eq("payment:confirm:lock:" + PORTONE_PAYMENT_ID), anyString());
         }
 
         @Test
@@ -168,13 +168,12 @@ class WebhookConcurrencyTest {
             Payment payment = pendingPayment();
             given(webhookTransactionService.getPaymentByKey(anyString())).willReturn(payment);
 
-            // AtomicBoolean으로 Redis SET NX 시뮬레이션 — 첫 번째 스레드만 true
+            // AtomicBoolean으로 Redis SET NX 시뮬레이션 — 첫 번째 스레드만 토큰 반환
             AtomicBoolean lockHeld = new AtomicBoolean(false);
             given(redisUtil.acquireLock(anyString(), anyLong()))
-                    .willAnswer(inv -> lockHeld.compareAndSet(false, true));
-            willDoNothing().given(redisUtil).releaseLock(anyString());
+                    .willAnswer(inv -> lockHeld.compareAndSet(false, true) ? MOCK_LOCK_TOKEN : null);
+            willDoNothing().given(redisUtil).releaseLock(anyString(), anyString());
             willDoNothing().given(webhookTransactionService).completePendingPayment(anyLong(), anyLong(), any());
-            willDoNothing().given(webhookTransactionService).markEventFailed(anyLong(), anyString());
 
             int threadCount = 2;
             CountDownLatch startLatch = new CountDownLatch(1);
@@ -205,8 +204,8 @@ class WebhookConcurrencyTest {
             assertThat(errorCount.get()).isZero();
             // 포인트 충전(completePendingPayment)은 락을 획득한 스레드만 실행 → 1번
             verify(webhookTransactionService, times(1)).completePendingPayment(anyLong(), anyLong(), any());
-            // 락을 못 얻은 스레드는 markEventFailed → 1번
-            verify(webhookTransactionService, times(1)).markEventFailed(anyLong(), anyString());
+            // 락 실패 경로에서 markEventFailed를 호출하지 않음 — WebhookEvent는 PENDING 유지
+            verify(webhookTransactionService, never()).markEventFailed(any(), anyString());
         }
 
         @Test
@@ -248,8 +247,8 @@ class WebhookConcurrencyTest {
         @DisplayName("completePendingPayment 중 예외 발생해도 finally에서 락 반드시 해제")
         void webhook_whenCompletePendingPaymentThrows_lockMustBeReleased() {
             // given
-            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(true);
-            willDoNothing().given(redisUtil).releaseLock(anyString());
+            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(MOCK_LOCK_TOKEN);
+            willDoNothing().given(redisUtil).releaseLock(anyString(), anyString());
 
             WebhookEvent event = webhookEvent(WEBHOOK_EVENT_ID);
             given(webhookTransactionService.prepareWebhookEvent(anyString(), any(), anyString(), any()))
@@ -275,7 +274,8 @@ class WebhookConcurrencyTest {
             }
 
             // then - 예외가 발생해도 finally 블록에서 락이 반드시 해제되어야 한다
-            verify(redisUtil, times(1)).releaseLock("payment:confirm:lock:" + PORTONE_PAYMENT_ID);
+            verify(redisUtil, times(1)).releaseLock(
+                    eq("payment:confirm:lock:" + PORTONE_PAYMENT_ID), anyString());
         }
     }
 }

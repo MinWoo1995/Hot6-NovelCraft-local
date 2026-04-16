@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -66,6 +67,7 @@ class PaymentConcurrencyTest {
     private static final Long AMOUNT = 10_000L;
     private static final String PAYMENT_KEY = "payment-test-abc123";
     private static final String CANCEL_REASON = "테스트 환불";
+    private static final String MOCK_LOCK_TOKEN = "mock-lock-token";
 
     /**
      * status=COMPLETED 인 Payment mock 생성.
@@ -100,7 +102,7 @@ class PaymentConcurrencyTest {
         @DisplayName("락 획득 실패 시 ERR_PAYMENT_ALREADY_CANCELING 예외 반환")
         void cancelPayment_whenLockNotAcquired_throwsAlreadyCanceling() {
             // given
-            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(false);
+            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn((String) null);
 
             // when & then
             assertThatThrownBy(() -> paymentService.cancelPayment(USER_ID, PAYMENT_ID, CANCEL_REASON))
@@ -116,10 +118,10 @@ class PaymentConcurrencyTest {
         void cancelPayment_concurrentTwoRequests_deductCalledOnlyOnce() throws InterruptedException {
             // given
             // AtomicBoolean으로 Redis SET NX 동작 시뮬레이션
-            // compareAndSet(false, true): 첫 번째 스레드만 true, 나머지는 false
+            // compareAndSet(false, true): 첫 번째 스레드만 토큰 반환, 나머지는 null
             AtomicBoolean lockHeld = new AtomicBoolean(false);
             given(redisUtil.acquireLock(anyString(), anyLong()))
-                    .willAnswer(inv -> lockHeld.compareAndSet(false, true));
+                    .willAnswer(inv -> lockHeld.compareAndSet(false, true) ? MOCK_LOCK_TOKEN : null);
 
             // ★ mock은 given().willReturn() 밖에서 미리 생성
             Payment completedPayment = completedPaymentMock();
@@ -183,7 +185,7 @@ class PaymentConcurrencyTest {
             // given
             AtomicBoolean lockHeld = new AtomicBoolean(false);
             given(redisUtil.acquireLock(anyString(), anyLong()))
-                    .willAnswer(inv -> lockHeld.compareAndSet(false, true));
+                    .willAnswer(inv -> lockHeld.compareAndSet(false, true) ? MOCK_LOCK_TOKEN : null);
 
             // ★ mock 미리 생성
             Payment completedPayment = completedPaymentMock();
@@ -231,7 +233,7 @@ class PaymentConcurrencyTest {
         @DisplayName("포트원 실패 시 포인트 복구 후 락 해제")
         void cancelPayment_whenPortOneFails_compensatesAndReleasesLock() {
             // given
-            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(true);
+            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(MOCK_LOCK_TOKEN);
 
             Payment completedPayment = completedPaymentMock();
             given(paymentTransactionService.getPaymentForCancel(USER_ID, PAYMENT_ID))
@@ -249,7 +251,8 @@ class PaymentConcurrencyTest {
             verify(pointService, times(1)).compensateDeduct(USER_ID, AMOUNT);
 
             // finally 블록에서 락이 반드시 해제되어야 한다
-            verify(redisUtil, times(1)).releaseLock("payment:cancel:lock:" + PAYMENT_ID);
+            verify(redisUtil, times(1)).releaseLock(
+                    eq("payment:cancel:lock:" + PAYMENT_ID), anyString());
         }
     }
 
@@ -268,7 +271,7 @@ class PaymentConcurrencyTest {
         @DisplayName("락 획득 실패 시 ERR_PAYMENT_PROCESSING 예외 반환")
         void confirmPayment_whenLockNotAcquired_throwsPaymentProcessing() {
             // given
-            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(false);
+            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn((String) null);
 
             // when & then
             assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, confirmRequest()))
@@ -285,7 +288,7 @@ class PaymentConcurrencyTest {
             // given
             AtomicBoolean lockHeld = new AtomicBoolean(false);
             given(redisUtil.acquireLock(anyString(), anyLong()))
-                    .willAnswer(inv -> lockHeld.compareAndSet(false, true));
+                    .willAnswer(inv -> lockHeld.compareAndSet(false, true) ? MOCK_LOCK_TOKEN : null);
 
             // ★ mock 미리 생성
             Payment pendingPayment = mock(Payment.class);
@@ -356,7 +359,7 @@ class PaymentConcurrencyTest {
         @DisplayName("포트원 검증 중 예외 발생 시 finally에서 락 반드시 해제")
         void confirmPayment_whenPortOneFails_lockMustBeReleased() {
             // given
-            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(true);
+            given(redisUtil.acquireLock(anyString(), anyLong())).willReturn(MOCK_LOCK_TOKEN);
 
             Payment pendingPayment = mock(Payment.class);
             given(pendingPayment.getId()).willReturn(PAYMENT_ID);
@@ -372,7 +375,8 @@ class PaymentConcurrencyTest {
                     .hasMessage(PaymentExceptionEnum.ERR_PORTONE_API_ERROR.getMessage());
 
             // 예외가 발생해도 finally 블록에서 락이 반드시 해제되어야 한다
-            verify(redisUtil, times(1)).releaseLock("payment:confirm:lock:" + PAYMENT_KEY);
+            verify(redisUtil, times(1)).releaseLock(
+                    eq("payment:confirm:lock:" + PAYMENT_KEY), anyString());
         }
     }
 }
