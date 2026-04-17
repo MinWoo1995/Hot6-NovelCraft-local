@@ -17,6 +17,7 @@ import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -43,6 +44,7 @@ public class MentorService {
      * 멘토 등록 신청
      * - PENDING 또는 APPROVED 상태의 기존 신청이 있으면 중복 신청 불가
      * - careerLevel 기준으로 입문/중급 자동 승인, 전문은 PENDING 유지
+     * - 동시 요청으로 DataIntegrityViolationException 발생 시 중복 처리
      */
     @Transactional
     public MentorRegisterResponse register(Long userId, MentorRegisterRequest request,
@@ -75,7 +77,7 @@ public class MentorService {
         try {
             Mentor saved = mentorRepository.save(mentor);
             return MentorRegisterResponse.from(saved);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException e) {
             throw new ServiceErrorException(MentorExceptionEnum.MENTOR_ALREADY_APPROVED);
         }
     }
@@ -83,6 +85,7 @@ public class MentorService {
     /**
      * 멘토 정보 수정
      * - null 필드는 기존 값 유지 (부분 업데이트)
+     * - 빈 리스트([])는 명시적으로 비우기
      */
     @Transactional
     public MentorUpdateResponse update(Long userId, MentorUpdateRequest request) {
@@ -95,9 +98,9 @@ public class MentorService {
 
         mentor.update(
                 request.introduction(),
-                toJson(request.mainGenres()),
-                toJson(request.specialFields()),
-                toJson(request.mentoringStyles()),
+                toJsonForUpdate(request.mainGenres()),
+                toJsonForUpdate(request.specialFields()),
+                toJsonForUpdate(request.mentoringStyles()),
                 request.careerHistory(),
                 request.maxMentees(),
                 request.allowInstant(),
@@ -153,6 +156,9 @@ public class MentorService {
         return file.getOriginalFilename();
     }
 
+    /**
+     * 등록용 직렬화 - null과 빈 리스트 둘 다 null 반환
+     */
     private String toJson(List<String> list) {
         if (list == null || list.isEmpty()) {
             return null;
@@ -160,7 +166,20 @@ public class MentorService {
         try {
             return objectMapper.writeValueAsString(list);
         } catch (JsonProcessingException e) {
-            // JSON 직렬화 실패 - 파일 업로드와 무관한 내부 오류
+            throw new ServiceErrorException(MentorExceptionEnum.MENTOR_JSON_SERIALIZE_FAILED);
+        }
+    }
+
+    /**
+     * 수정용 직렬화 - null이면 null 반환(기존 값 유지), 빈 리스트면 "[]" 반환(명시적 비우기)
+     */
+    private String toJsonForUpdate(List<String> list) {
+        if (list == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(list);
+        } catch (JsonProcessingException e) {
             throw new ServiceErrorException(MentorExceptionEnum.MENTOR_JSON_SERIALIZE_FAILED);
         }
     }
