@@ -29,8 +29,9 @@ public class StompChannelInterceptor implements ChannelInterceptor {
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        // CONNECT 프레임에서만 JWT 검증
-        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+        if (accessor == null) return message;
+
+        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String authHeader = accessor.getFirstNativeHeader("Authorization");
 
             if (authHeader == null || !authHeader.startsWith(JwtUtil.BEARER_PREFIX)) {
@@ -51,6 +52,13 @@ public class StompChannelInterceptor implements ChannelInterceptor {
                     userId.toString(), null, userDetails.getAuthorities()
             ));
             log.info("[WebSocket] 연결 인증 완료 userId={}", userId);
+
+        } else if (StompCommand.SEND.equals(accessor.getCommand())
+                || StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+            // CONNECT 없이 직접 SEND/SUBSCRIBE를 보내는 비인증 세션 차단
+            if (accessor.getUser() == null) {
+                throw new ServiceErrorException(ChatExceptionEnum.ERR_WEBSOCKET_UNAUTHORIZED);
+            }
         }
 
         return message;

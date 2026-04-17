@@ -1,5 +1,7 @@
 package com.example.hot6novelcraft.domain.chatroom.controller;
 
+import com.example.hot6novelcraft.common.exception.ServiceErrorException;
+import com.example.hot6novelcraft.common.exception.domain.ChatExceptionEnum;
 import com.example.hot6novelcraft.domain.chatroom.dto.request.ChatMessageRequest;
 import com.example.hot6novelcraft.domain.chatroom.dto.response.ChatEventResponse;
 import com.example.hot6novelcraft.domain.chatroom.dto.response.ChatMessageResponse;
@@ -33,6 +35,10 @@ public class ChatController {
             @DestinationVariable Long roomId,
             @Payload ChatMessageRequest request,
             Principal principal) {
+        if (request.content() == null || request.content().isBlank() || request.messageType() == null) {
+            throw new ServiceErrorException(ChatExceptionEnum.ERR_INVALID_MESSAGE);
+        }
+
         Long senderId = Long.parseLong(principal.getName());
 
         ChatMessageResponse response = chatService.saveMessage(roomId, senderId, request);

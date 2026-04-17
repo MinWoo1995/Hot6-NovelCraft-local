@@ -18,6 +18,7 @@ import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,10 +68,18 @@ public class ChatService {
                     return ChatRoomResponse.from(room);
                 })
                 .orElseGet(() -> {
-                    ChatRoom room = chatRoomRepository.save(
-                            ChatRoom.create(mentorshipId, mentorUserId, menteeUserId)
-                    );
-                    return ChatRoomResponse.from(room);
+                    try {
+                        ChatRoom room = chatRoomRepository.save(
+                                ChatRoom.create(mentorshipId, mentorUserId, menteeUserId)
+                        );
+                        return ChatRoomResponse.from(room);
+                    } catch (DataIntegrityViolationException e) {
+                        // 동시 요청으로 unique 제약 위반 시 이미 생성된 방 반환
+                        return ChatRoomResponse.from(
+                                chatRoomRepository.findByMentorshipId(mentorshipId)
+                                        .orElseThrow(() -> new ServiceErrorException(ChatExceptionEnum.ERR_CHATROOM_NOT_FOUND))
+                        );
+                    }
                 });
     }
 

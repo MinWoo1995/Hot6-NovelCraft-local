@@ -548,9 +548,9 @@ async function loadMessages(initial = false) {
 
   try {
     const res = await api(`/api/chatrooms/${currentRoom.id}/messages?page=${currentPage}&size=30`);
-    totalPages = res.totalPages;
+    totalPages = res.data.totalPages;
 
-    const msgs = (res.content || []).reverse();
+    const msgs = (res.data.content || []).reverse();
 
     if (initial) listEl.innerHTML = '';
 
@@ -614,7 +614,7 @@ function connectWs(roomId) {
   setWsStatus('connecting');
 
   stompClient = new StompJs.Client({
-    brokerURL: `ws://${location.host}/ws-chat`,
+    brokerURL: `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws-chat`,
     connectHeaders: { Authorization: token },
     reconnectDelay: 5000,
     onConnect: () => {
