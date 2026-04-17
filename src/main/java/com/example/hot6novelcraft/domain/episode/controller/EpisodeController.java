@@ -106,4 +106,20 @@ public class EpisodeController {
                 BaseResponse.success("200", "회차 목록 조회 성공", response)
         );
     }
+
+    /**
+     * 회차 본문 조회 V1 (JPA)
+     * 정은식
+     */
+    @GetMapping("/v1/episodes/{episodeId}")
+    public ResponseEntity<BaseResponse<EpisodeDetailResponse>> getEpisodeContentV1(
+            @PathVariable Long episodeId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        EpisodeDetailResponse response = episodeService.getEpisodeContentV1(episodeId, userDetails);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "회차 본문 조회 성공", response)
+        );
+    }
 }

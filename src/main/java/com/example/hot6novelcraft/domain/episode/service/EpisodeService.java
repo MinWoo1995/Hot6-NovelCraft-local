@@ -13,14 +13,18 @@ import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.entity.enums.NovelStatus;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
+import com.example.hot6novelcraft.domain.point.entity.enums.PointHistoryType;
+import com.example.hot6novelcraft.domain.point.repository.PointHistoryRepository;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.Objects;
 
 @Service
@@ -32,6 +36,8 @@ public class EpisodeService {
 
     private final EpisodeRepository episodeRepository;
     private final NovelRepository novelRepository;
+    private final PointHistoryRepository pointHistoryRepository;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     // 회차 생성
     @Transactional
@@ -170,6 +176,29 @@ public class EpisodeService {
         return PageResponse.register(episodes);
     }
 
+    // 회차 본문 조회 V1 (JPA 단건 조회)
+    @Transactional
+    public EpisodeDetailResponse getEpisodeContentV1(Long episodeId, UserDetailsImpl userDetails) {
+
+        Long userId = userDetails.getUser().getId();
+
+        // 회차 조회
+        Episode episode = findEpisodeById(episodeId);
+
+        // 발행된 회차인지 확인
+        if (episode.getStatus() != EpisodeStatus.PUBLISHED) {
+            throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_PUBLISHED);
+        }
+
+        // 유료 회차 접근 제어 (PointHistory 이력 체크)
+        validateEpisodeAccess(episode, userId);
+
+        // 소설 조회수 +1 (어뷰징 방지)
+        increaseNovelViewCount(episode.getNovelId(), userId);
+
+        return EpisodeDetailResponse.from(episode);
+    }
+
 
     // -----------------------------------------공통 매서드---------------------------------------------------------------
 
@@ -207,5 +236,36 @@ public class EpisodeService {
             throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_ALREADY_DELETED);
         }
         return episode;
+    }
+
+    // 소설 조회수 +1 (어뷰징 방지)
+    private void increaseNovelViewCount(Long novelId, Long userId) {
+
+        String viewKey = "novel_view::" + userId + "::" + novelId;
+
+        // 어뷰징 방지 TTL 1시간
+        Boolean isFirst = redisTemplate.opsForValue()
+                .setIfAbsent(viewKey, "1", Duration.ofHours(1));
+
+        // 처음 조회때 조회수+1
+        if (Boolean.TRUE.equals(isFirst)) {
+            novelRepository.incrementViewCount(novelId);
+        }
+    }
+
+    // 유료 회차 접근 제어 (PointHistory 이력 체크)
+    private void validateEpisodeAccess(Episode episode, Long userId) {
+
+        if (episode.isFree()) {
+            return;
+        }
+
+        // 구매이력조회
+        boolean hasPurchased = pointHistoryRepository
+                .existsByUserIdAndEpisodeIdAndType(userId, episode.getId(), PointHistoryType.NOVEL);
+
+        if (!hasPurchased) {
+            throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_POINT_REQUIRED);
+        }
     }
 }
