@@ -34,4 +34,20 @@ public class ChatMessage extends BaseEntity {
 
     @Column(nullable = false)
     private boolean isRead;
+
+    private ChatMessage(Long roomId, Long senderId, String content, MessageType messageType) {
+        this.roomId = roomId;
+        this.senderId = senderId;
+        this.content = content;
+        this.messageType = messageType;
+        this.isRead = false;
+    }
+
+    public static ChatMessage create(Long roomId, Long senderId, String content, MessageType messageType) {
+        return new ChatMessage(roomId, senderId, content, messageType);
+    }
+
+    public void markAsRead() {
+        this.isRead = true;
+    }
 }
