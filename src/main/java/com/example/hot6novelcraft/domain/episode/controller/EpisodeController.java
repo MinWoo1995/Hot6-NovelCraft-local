@@ -119,7 +119,23 @@ public class EpisodeController {
         EpisodeDetailResponse response = episodeService.getEpisodeContentV1(episodeId, userDetails);
 
         return ResponseEntity.ok(
-                BaseResponse.success("200", "회차 본문 조회 성공", response)
+                BaseResponse.success("200", "회차 본문 조회 성공(V1)", response)
+        );
+    }
+
+    /**
+     * 회차 본문 조회 V2 (Hot Key + 벌크 캐싱)
+     * 정은식
+     */
+    @GetMapping("/v2/episodes/{episodeId}")
+    public ResponseEntity<BaseResponse<EpisodeDetailResponse>> getEpisodeContentV2(
+            @PathVariable Long episodeId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        EpisodeDetailResponse response = episodeService.getEpisodeContentV2(episodeId, userDetails);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "회차 본문 조회 성공(V2)", response)
         );
     }
 }
