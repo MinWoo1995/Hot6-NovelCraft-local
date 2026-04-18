@@ -2,7 +2,6 @@ package com.example.hot6novelcraft.domain.user.service;
 
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.OAuth2ExceptionEnum;
-import com.example.hot6novelcraft.common.exception.domain.UserExceptionEnum;
 import com.example.hot6novelcraft.domain.user.entity.SocialAuth;
 import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
@@ -19,6 +18,8 @@ import org.springframework.security.oauth2.core.OAuth2Error;                    
 import org.springframework.security.oauth2.core.user.OAuth2User;                      // ✅ import 추가
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
 
 @Slf4j(topic = "CustomOAuth2UserService")
 @Service
@@ -88,10 +89,17 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             return new UserDetailsImpl(user, oAuth2User.getAttributes());
     }
 
-        // 플랫폼별 이메일 추출 (현재는 구글만)
+        // 플랫폼별 이메일 추출
         private String extractEmail(OAuth2User oAuth2User, String registrationId) {
             return switch (registrationId.toLowerCase()) {
                 case "google" -> oAuth2User.getAttribute("email");
+                case "kakao" -> {
+                    Object idObj = oAuth2User.getAttributes().get("id");
+                    Long kakaoId = idObj instanceof Long? (Long) idObj : Long.valueOf(String.valueOf(idObj));
+                    Map<String, Object> kakaoAccount = oAuth2User.getAttribute("kakao_account");
+                    String kakaoEmail = kakaoAccount != null ? (String) kakaoAccount.get("email") : null;
+                    yield kakaoEmail != null ? kakaoEmail : kakaoId + "@kakao.com"; //  이메일이 없으면 임시 생성
+                }
                 default -> throw new OAuth2AuthenticationException(
                         new OAuth2Error("unsupported_provider"), "지원하지 않는 소셜 플랫폼입니다: " + registrationId);
             };
@@ -101,6 +109,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         private String extractProviderId(OAuth2User oAuth2User, String registrationId) {
             return switch (registrationId.toLowerCase()) {
                 case "google" -> oAuth2User.getAttribute("sub");
+                case "kakao" -> String.valueOf(oAuth2User.getAttributes().get("id"));
                 default -> throw new OAuth2AuthenticationException(
                         new OAuth2Error("unsupported_provider"), "지원하지 않는 소셜 플랫폼입니다: " + registrationId);
             };
