@@ -41,6 +41,10 @@ public enum UserExceptionEnum implements ErrorCode {
     , ERR_PASSWORD_NOT_MATCH(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 일치 하지 않습니다")
     , ERR_SAME_AS_OLD_PASSWORD(HttpStatus.CONFLICT, "현재 비밀번호와 동일합니다. 다시 입력해주세요")
 
+    // 작가 팔로우
+    , ERR_SELF_FOLLOW_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "본인을 팔로우할 수 없습니다")
+    , ERR_NOT_AUTHOR(HttpStatus.BAD_REQUEST, "작가가 아닌 유저는 팔로우할 수 없습니다")
+
     // Token
     , ERR_ACCESS_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "AccessToken이 만료되었습니다. 재발급해주세요")
     , ERR_REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "RefreshToke이 만료되었습니다. 다시 로그인해주세요")
