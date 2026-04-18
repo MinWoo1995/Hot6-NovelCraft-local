@@ -49,6 +49,7 @@ public class JwtFilter extends OncePerRequestFilter {
                     , "/api/auth/phone/verify"
                     , "/payment-test.html"
                     , "/social-login-test.html"
+                    , "/chat-test.html"
                     , "/api/webhooks/portone"
                     , "/favicon.ico"
                     , "/login"          // 구글이 에러 시 여기로 리다이렉트
@@ -60,9 +61,11 @@ public class JwtFilter extends OncePerRequestFilter {
         return path.startsWith("/oauth2/authorize") // 소셜 로그인 시작
                 || path.startsWith("/api/auth/login/oauth2")
                 || path.startsWith("/login/oauth2")
+                || path.equals("/ws-chat") || path.startsWith("/ws-chat/")     // WebSocket (SockJS info 포함) - 인증은 StompChannelInterceptor 처리
                 || path.equals("/login")          // 구글 에러 리다이렉트
                 || path.equals("/favicon.ico")
                 || path.equals("/social-login-test.html")
+                || path.equals("/chat-test.html")
                 || path.equals("/error");
     }
 

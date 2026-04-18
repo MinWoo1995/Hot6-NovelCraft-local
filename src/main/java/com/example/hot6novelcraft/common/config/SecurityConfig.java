@@ -91,6 +91,8 @@ public class SecurityConfig {
                                 , "/css/**"
                                 , "/js/**"
                                 , "/images/**"
+                                // WebSocket (STOMP + SockJS)
+                                , "/ws-chat/**"
                         ).permitAll()
                         .requestMatchers("/api/calendars/**").hasAnyAuthority("READER", "AUTHOR")
                 .anyRequest().authenticated()
