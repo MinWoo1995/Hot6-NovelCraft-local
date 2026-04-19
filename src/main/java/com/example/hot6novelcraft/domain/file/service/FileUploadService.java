@@ -61,7 +61,12 @@ public class FileUploadService {
                     .contentLength(file.getSize())
                     .build();
 
-            s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
+            try (var inputStream = file.getInputStream()) {
+                s3Client.putObject(
+                        putObjectRequest,
+                        RequestBody.fromInputStream(inputStream, file.getSize())
+                );
+            }
 
             String fileUrl = buildS3Url(s3Key);
             log.info("[S3] 파일 업로드 성공: {} -> {}", truncateFilename(originalFilename), fileUrl);
