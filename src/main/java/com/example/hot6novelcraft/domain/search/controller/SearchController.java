@@ -32,11 +32,11 @@ public class SearchController {
 
     /** ============ V1 ===============
      1. 제목(소설) 검색
-     - GET /api/search/v2/novels?keyword=바다
+     - GET /api/search/v1/novels?keyword=바다
      2. 태그 검색
-     - 복수 검색시 : GET /api/search/v2/tags?tags=FANTASY&tags=MUNCHKIN
+     - 복수 검색시 : GET /api/search/v1/tags?tags=FANTASY&tags=MUNCHKIN
      3. 작가 검색
-     - GET /api/search/v2/authors?keyword=백산
+     - GET /api/search/v1/authors?keyword=백산
      - 유사 닉네임 작가 목록 + 유사 키워드 제목 포함 소설 목록
      =================================== */
     @GetMapping("/v1/novels")
