@@ -4,6 +4,7 @@ import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.ChatExceptionEnum;
 import com.example.hot6novelcraft.domain.chatmessage.entity.ChatMessage;
+import com.example.hot6novelcraft.domain.chatmessage.entity.enums.MessageType;
 import com.example.hot6novelcraft.domain.chatmessage.repository.ChatMessageRepository;
 import com.example.hot6novelcraft.domain.chatroom.dto.request.ChatMessageRequest;
 import com.example.hot6novelcraft.domain.chatroom.dto.response.ChatMessageResponse;
@@ -132,11 +133,21 @@ public class ChatService {
             throw new ServiceErrorException(ChatExceptionEnum.ERR_INVALID_MESSAGE);
         }
 
+        // FILE 타입일 경우 fileUrl 필수
+        if (request.messageType() == MessageType.FILE) {
+            if (request.fileUrl() == null || request.fileUrl().isBlank()) {
+                throw new ServiceErrorException(ChatExceptionEnum.ERR_INVALID_MESSAGE);
+            }
+        }
+
         ChatRoom room = getChatRoomOrThrow(roomId);
         validateActiveParticipant(room, senderId);
-        ChatMessage message = chatMessageRepository.save(
-                ChatMessage.create(roomId, senderId, request.content(), request.messageType())
-        );
+
+        // fileUrl이 있으면 createWithFile() 사용, 없으면 create() 사용
+        ChatMessage message = (request.fileUrl() != null && !request.fileUrl().isBlank())
+                ? chatMessageRepository.save(ChatMessage.createWithFile(roomId, senderId, request.content(), request.messageType(), request.fileUrl()))
+                : chatMessageRepository.save(ChatMessage.create(roomId, senderId, request.content(), request.messageType()));
+
         return ChatMessageResponse.from(message);
     }
 
