@@ -48,7 +48,7 @@ public class SearchController {
         return ResponseEntity.ok(BaseResponse.success("200", "소설 제목 검색 성공(V1)", PageResponse.register(result)));
     }
 
-    @GetMapping("/tags")
+    @GetMapping("/v1/tags")
     public ResponseEntity<BaseResponse<List<TagGroupSearchResponse>>> searchByTagsV1(
             @RequestParam List<String> tags
     ) {
@@ -56,7 +56,7 @@ public class SearchController {
         return ResponseEntity.ok(BaseResponse.success("200", "소설 태그 검색 성공(V1)", result));
     }
 
-    @GetMapping("/authors")
+    @GetMapping("/v1/authors")
     public ResponseEntity<BaseResponse<IntegratedAuthorSearchResponse>> searchAuthorsV1(
             @RequestParam String keyword
     ) {
@@ -75,11 +75,11 @@ public class SearchController {
             throw new ServiceErrorException(SearchExceptionEnum.ERR_SEARCH_KEYWORD_EMPTY);
         }
 
-        Page<NovelSearchResponse> result = searchService.searchNovels(keyword, pageable, userDetails);
+        Page<NovelSearchResponse> result = searchService.searchNovels(keyword.trim(), pageable, userDetails);
         return ResponseEntity.ok(BaseResponse.success("200", "소설 제목 검색 성공", PageResponse.register(result)));
     }
 
-    @GetMapping("/tags")
+    @GetMapping("/v2/tags")
     public ResponseEntity<BaseResponse<List<TagGroupSearchResponse>>> searchTags(
             @RequestParam List<String> tags,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -88,7 +88,7 @@ public class SearchController {
         return ResponseEntity.ok(BaseResponse.success("200", "소설 태그 검색 성공", result));
     }
 
-    @GetMapping("/authors")
+    @GetMapping("/v2/authors")
     public ResponseEntity<BaseResponse<IntegratedAuthorSearchResponse>> searchAuthors(
             @RequestParam String keyword,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -96,7 +96,7 @@ public class SearchController {
             throw new ServiceErrorException(SearchExceptionEnum.ERR_SEARCH_KEYWORD_EMPTY);
         }
 
-        IntegratedAuthorSearchResponse result = searchService.searchAuthors(keyword, userDetails);
+        IntegratedAuthorSearchResponse result = searchService.searchAuthors(keyword.trim(), userDetails);
         return ResponseEntity.ok(BaseResponse.success("200", "작가 검색 성공", result));
     }
 }

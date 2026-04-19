@@ -7,6 +7,7 @@ import com.example.hot6novelcraft.domain.user.entity.QUser;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -126,64 +127,73 @@ public class CustomSearchRepositoryImpl implements CustomSearchRepository {
                 .map(t -> t.get(user.id))
                 .toList();
 
-        // 모든 작가 소설 IN 으로 한번에 조회
-        List<Tuple> allNovels = queryFactory
-                .select(
-                        novel.authorId
-                        , novel.id
-                        , novel.title
-                        , novel.coverImageUrl
-                )
-                .from(novel)
-                .where(
-                        novel.authorId.in(authorIds)
-                        , novel.isDeleted.eq(false)
-                )
-                .orderBy(novel.viewCount.desc())
-                .fetch();
+        List<AuthorSearchResponse> matchingAuthors;
 
-        // 작가별 소설 그룹핑
-        Map<Long, List<AuthorSearchResponse.NovelSimple>> novelsByAuthor = allNovels.stream()
-                .collect(Collectors.groupingBy(
-                        t -> t.get(novel.authorId)
-                , Collectors.mapping(
-                        t -> new AuthorSearchResponse.NovelSimple(
-                                t.get(novel.id)
-                                , t.get(novel.title)
-                                , t.get(novel.coverImageUrl)
-                        ),
-                        Collectors.toList()
-                )
-        ));
+        if(authorIds.isEmpty()) {
+            matchingAuthors = List.of();
 
-        // 작가별 대표작 3개 표시
-        List<AuthorSearchResponse> matchingAuthors = authorTuples.stream()
-                .map(t -> new AuthorSearchResponse(
-                        t.get(user.id)
-                        , t.get(user.nickname)
-                        , t.get(authorProfile.bio)
-                        , novelsByAuthor.getOrDefault(t.get(user.id), List.of())
-                        .stream()
-                        .limit(3)
-                        .toList()
-                ))
-                .toList();
+        } else {
 
-        // 제목 키워드 소설 목록
-        List<NovelSimpleResponse> matchingNovels = queryFactory
-                .select(Projections.constructor(
-                        NovelSimpleResponse.class
-                        , novel.title
-                        , user.nickname
-                ))
-                .from(novel)
-                .join(user).on(novel.authorId.eq(user.id))
-                .where(
-                        novel.title.containsIgnoreCase(keyword)
-                        , novel.isDeleted.eq(false)
-                )
-                .fetch();
+            // 모든 작가 소설 IN 으로 한번에 조회
+            List<Tuple> allNovels = queryFactory
+                    .select(
+                            novel.authorId
+                            , novel.id
+                            , novel.title
+                            , novel.coverImageUrl
+                    )
+                    .from(novel)
+                    .where(
+                            novel.authorId.in(authorIds)
+                            , novel.isDeleted.eq(false)
+                    )
+                    .orderBy(novel.viewCount.desc())
+                    .limit((long) authorIds.size() * 3)
+                    .fetch();
 
-        return new IntegratedAuthorSearchResponse(matchingAuthors, matchingNovels);
+            // 작가별 소설 그룹핑
+            Map<Long, List<AuthorSearchResponse.NovelSimple>> novelsByAuthor = allNovels.stream()
+                    .collect(Collectors.groupingBy(
+                            t -> t.get(novel.authorId)
+                            , Collectors.mapping(
+                                    t -> new AuthorSearchResponse.NovelSimple(
+                                            t.get(novel.id)
+                                            , t.get(novel.title)
+                                            , t.get(novel.coverImageUrl)
+                                    ),
+                                    Collectors.toList()
+                            )
+                    ));
+
+            matchingAuthors = authorTuples.stream()
+                    .map(t -> new AuthorSearchResponse(
+                            t.get(user.id)
+                            , t.get(user.nickname)
+                            , t.get(authorProfile.bio)
+                            , novelsByAuthor
+                                .getOrDefault(t.get(user.id), List.of())
+                                .stream()
+                                .limit(3)
+                                .toList()
+                    ))
+                    .toList();
+        }
+
+            // 제목 키워드 소설 목록
+            List<NovelSimpleResponse> matchingNovels = queryFactory
+                    .select(Projections.constructor(
+                            NovelSimpleResponse.class
+                            , novel.title
+                            , user.nickname
+                    ))
+                    .from(novel)
+                    .join(user).on(novel.authorId.eq(user.id))
+                    .where(
+                            novel.title.containsIgnoreCase(keyword)
+                            , novel.isDeleted.eq(false)
+                    )
+                    .fetch();
+
+            return new IntegratedAuthorSearchResponse(matchingAuthors, matchingNovels);
     }
 }
