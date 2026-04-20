@@ -44,7 +44,7 @@ public class DataInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
 
         // 기존 데이터가 있으면 스킵 (에러 방지)
-        if (novelRepository.count() > 0
+        if (userRepository.count() > 0
                 || authorProfileRepository.count() > 0
                 || novelRepository.count() > 0) {
             log.info("[DataInitializer] 기존 소설 데이터 존재 → 더미데이터 삽입 스킵");
