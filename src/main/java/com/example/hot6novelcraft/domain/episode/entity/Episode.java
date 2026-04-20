@@ -88,12 +88,6 @@ public class Episode extends BaseEntity {
         if (content != null) this.content = content;
     }
 
-    // 임시저장
-    public void saveDraft(String title, String content) {
-        if (title != null) this.title = title;
-        if (content != null) this.content = content;
-    }
-
     // 발행
     public void publish() {
         this.status = EpisodeStatus.PUBLISHED;
