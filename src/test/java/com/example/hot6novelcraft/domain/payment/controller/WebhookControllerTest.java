@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -20,9 +20,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -238,7 +238,13 @@ class WebhookControllerTest {
                     .andExpect(status().isOk());
 
             // then - WebhookRequest의 타입과 데이터가 올바르게 파싱되었는지 검증
-            verify(webhookService, times(1)).handleWebhook(any(WebhookRequest.class));
+            ArgumentCaptor<WebhookRequest> captor = ArgumentCaptor.forClass(WebhookRequest.class);
+            verify(webhookService, times(1)).handleWebhook(captor.capture());
+
+            WebhookRequest captured = captor.getValue();
+            assertThat(captured.type()).isEqualTo("Transaction.Paid");
+            assertThat(captured.data().paymentId()).isEqualTo(PAYMENT_ID);
+            assertThat(captured.data().transactionId()).isEqualTo(TRANSACTION_ID);
         }
 
         @Test

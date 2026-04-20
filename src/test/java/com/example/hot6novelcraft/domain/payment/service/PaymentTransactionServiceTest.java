@@ -10,6 +10,7 @@ import com.example.hot6novelcraft.domain.payment.entity.enums.PaymentStatus;
 import com.example.hot6novelcraft.domain.payment.repository.PaymentRepository;
 import com.example.hot6novelcraft.domain.point.service.PointService;
 import com.example.hot6novelcraft.domain.purchases.entity.Purchase;
+import com.example.hot6novelcraft.domain.purchases.entity.enums.PurchaseType;
 import com.example.hot6novelcraft.domain.purchases.repository.PurchaseRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -243,7 +244,12 @@ class PaymentTransactionServiceTest {
             // then
             ArgumentCaptor<Purchase> purchaseCaptor = ArgumentCaptor.forClass(Purchase.class);
             verify(purchaseRepository).save(purchaseCaptor.capture());
-            // Purchase.create()가 정적 팩토리 메서드이므로 ArgumentCaptor로 검증
+
+            Purchase captured = purchaseCaptor.getValue();
+            assertThat(captured.getUserId()).isEqualTo(USER_ID);
+            assertThat(captured.getType()).isEqualTo(PurchaseType.POINT);
+            assertThat(captured.getAmount()).isEqualTo(AMOUNT);
+            assertThat(captured.getPaymentId()).isEqualTo(PAYMENT_ID);
         }
 
         @Test

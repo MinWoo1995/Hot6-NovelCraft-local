@@ -316,6 +316,7 @@ class PaymentServiceTest {
             assertThat(result.status()).isEqualTo(PaymentStatus.REFUNDED.name());
 
             verify(pointService, times(1)).deduct(USER_ID, AMOUNT);
+            verify(paymentTransactionService, times(1)).finalizeCancel(PAYMENT_ID);
             verify(redisUtil, times(1)).acquireLock(eq("payment:cancel:lock:" + PAYMENT_ID));
             verify(redisUtil, times(1)).releaseLock(eq("payment:cancel:lock:" + PAYMENT_ID));
             verify(pointService, never()).compensateDeduct(any(), any());
