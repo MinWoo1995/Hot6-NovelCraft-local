@@ -12,7 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/episodes")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class EpisodeCommentController {
 
@@ -21,7 +21,7 @@ public class EpisodeCommentController {
     /**
      * 댓글 작성
      */
-    @PostMapping("/{episodeId}/comments")
+    @PostMapping("episodes/{episodeId}/comments")
     public ResponseEntity<BaseResponse<EpisodeCommentCreateResponse>> createComment(
             @PathVariable Long episodeId,
             @Valid @RequestBody EpisodeCommentCreateRequest request,
@@ -32,6 +32,21 @@ public class EpisodeCommentController {
 
         return ResponseEntity.ok(
                 BaseResponse.success("OK", "댓글 작성 성공", response)
+        );
+    }
+
+    /**
+     * 댓글 삭제 (hard delete)
+     */
+    @DeleteMapping("/comments/{commentId}")
+    public ResponseEntity<BaseResponse<Void>> deleteComment(
+            @PathVariable Long commentId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        episodeCommentService.deleteComment(commentId, userDetails);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("OK", "댓글 삭제 성공", null)
         );
     }
 }

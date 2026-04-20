@@ -55,4 +55,23 @@ public class EpisodeCommentService {
 
         return EpisodeCommentCreateResponse.from(saved.getId());
     }
+
+    // 댓글 삭제 (하드 딜리트)
+    @Transactional
+    public void deleteComment(Long commentId, UserDetailsImpl userDetails) {
+
+        Long userId = userDetails.getUser().getId();
+
+        // 댓글 존재 여부 확인
+        EpisodeComment comment = episodeCommentRepository.findById(commentId)
+                .orElseThrow(() -> new ServiceErrorException(EpisodeExceptionEnum.COMMENT_NOT_FOUND));
+
+        // 본인 댓글인지 확인
+        if (!comment.getUserId().equals(userId)) {
+            throw new ServiceErrorException(EpisodeExceptionEnum.COMMENT_FORBIDDEN);
+        }
+
+        // 댓글 삭제(하듣 딜리트)
+        episodeCommentRepository.delete(comment);
+    }
 }
