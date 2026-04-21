@@ -20,6 +20,7 @@ import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -40,26 +41,9 @@ public class MentoringService {
 
     private final FileUploadService fileUploadService;
 
-
-    public Page<MentoringReceivedResponse> getReceivedMentorings(Long userId, Pageable pageable) {
-        Mentor mentor = mentorRepository.findByUserId(userId)
-                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
-
-        // TODO: 고도화 시 QueryDSL로 멘티명/소설명 JOIN 조회로 교체 (현재 N+1 발생 가능)
-        return mentorshipRepository.findAllByMentorIdOrderByCreatedAtDesc(mentor.getId(), pageable)
-                .map(mentorship -> {
-                    String menteeName = userRepository.findByIdAndIsDeletedFalse(mentorship.getMenteeId())
-                            .map(User::getNickname)
-                            .orElse("알 수 없는 사용자");
-
-                    // TODO: 고도화 시 NovelRepository에 findByIdAndIsDeletedFalse 추가 후 교체
-                    String title = novelRepository.findById(mentorship.getCurrentNovelId())
-                            .map(Novel::getTitle)
-                            .orElse("알 수 없는 소설");
-
-                    return MentoringReceivedResponse.of(mentorship, menteeName, title);
-                });
-    }
+    // =====================================================================
+    // 공통 로직 (V1 / V2 동일)
+    // =====================================================================
 
     @Transactional
     public void acceptMentee(Long mentoringId, Long menteeId, Long userId) {
@@ -72,20 +56,15 @@ public class MentoringService {
         if (!mentorship.getMentorId().equals(mentor.getId())) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_UNAUTHORIZED);
         }
-
         if (!mentorship.getMenteeId().equals(menteeId)) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_MENTEE_NOT_MATCH);
         }
-
         if (mentorship.getStatus() != MentorshipStatus.PENDING) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_ALREADY_PROCESSED);
         }
 
         mentor.decreaseSlot();
         mentorship.approve();
-
-        // TODO: 1:1 채팅방 자동 생성 (채팅 팀원 개발 후 연동)
-        // TODO: 멘티에게 수락 알림 발송 (알림 팀원 개발 후 연동)
     }
 
     @Transactional
@@ -99,18 +78,14 @@ public class MentoringService {
         if (!mentorship.getMentorId().equals(mentor.getId())) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_UNAUTHORIZED);
         }
-
         if (!mentorship.getMenteeId().equals(menteeId)) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_MENTEE_NOT_MATCH);
         }
-
         if (mentorship.getStatus() != MentorshipStatus.PENDING) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_ALREADY_PROCESSED);
         }
 
         mentorship.reject();
-
-        // TODO: 멘티에게 거절 알림 발송 (알림 팀원 개발 후 연동)
     }
 
     @Transactional
@@ -121,10 +96,9 @@ public class MentoringService {
         Mentorship mentorship = mentorshipRepository.findById(mentoringId)
                 .orElseThrow(() -> new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_FOUND));
 
-        if (!mentorship.getMentorId().equals(mentor.getUserId())) {
+        if (!mentorship.getMentorId().equals(mentor.getId())) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_UNAUTHORIZED);
         }
-
         if (mentorship.getManuscriptUrl() == null) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_MANUSCRIPT_NOT_FOUND);
         }
@@ -146,17 +120,72 @@ public class MentoringService {
         if (!mentorship.getMentorId().equals(mentor.getId())) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_UNAUTHORIZED);
         }
-
         if (mentorship.getStatus() != MentorshipStatus.ACCEPTED) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_ACCEPTED);
         }
 
         mentor.increaseSlot();
         mentorship.complete();
-
-        // TODO: 멘티에게 종료 알림 발송 (알림 팀원 개발 후 연동)
     }
 
+    // =====================================================================
+    // getReceivedMentorings
+    // =====================================================================
+
+    /**
+     * V1 - 내 멘토링 접수 목록 조회
+     * soft-delete 미적용 (findById 사용)
+     */
+    public Page<MentoringReceivedResponse> getReceivedMentorings(Long userId, Pageable pageable) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        return mentorshipRepository.findAllByMentorIdOrderByCreatedAtDesc(mentor.getId(), pageable)
+                .map(mentorship -> {
+                    String menteeName = userRepository.findByIdAndIsDeletedFalse(mentorship.getMenteeId())
+                            .map(User::getNickname)
+                            .orElse("알 수 없는 사용자");
+
+                    // V1: soft-delete 미적용 — 삭제된 소설 제목 노출 가능
+                    String title = novelRepository.findById(mentorship.getCurrentNovelId())
+                            .map(Novel::getTitle)
+                            .orElse("알 수 없는 소설");
+
+                    return MentoringReceivedResponse.of(mentorship, menteeName, title);
+                });
+    }
+
+    /**
+     * V2 - 내 멘토링 접수 목록 조회
+     * soft-delete 적용 (findByIdAndIsDeletedFalse 사용) — 삭제된 소설 제목 노출 방지
+     */
+    public Page<MentoringReceivedResponse> getReceivedMentoringsV2(Long userId, Pageable pageable) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        return mentorshipRepository.findAllByMentorIdOrderByCreatedAtDesc(mentor.getId(), pageable)
+                .map(mentorship -> {
+                    String menteeName = userRepository.findByIdAndIsDeletedFalse(mentorship.getMenteeId())
+                            .map(User::getNickname)
+                            .orElse("알 수 없는 사용자");
+
+                    // V2: soft-delete 적용 — 삭제된 소설은 "알 수 없는 소설" 반환
+                    String title = novelRepository.findByIdAndIsDeletedFalse(mentorship.getCurrentNovelId())
+                            .map(Novel::getTitle)
+                            .orElse("알 수 없는 소설");
+
+                    return MentoringReceivedResponse.of(mentorship, menteeName, title);
+                });
+    }
+
+    // =====================================================================
+    // getMentoringDetail
+    // =====================================================================
+
+    /**
+     * V1 - 멘토링 상세 조회
+     * soft-delete 미적용 (findById 사용)
+     */
     public MentoringDetailResponse getMentoringDetail(Long mentoringId, Long userId) {
         Mentor mentor = mentorRepository.findByUserId(userId)
                 .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
@@ -176,18 +205,25 @@ public class MentoringService {
                 .map(User::getNickname)
                 .orElse("알 수 없는 사용자");
 
+        // V1: soft-delete 미적용 — 삭제된 소설 제목 노출 가능
+        String novelTitle = novelRepository.findById(mentorship.getCurrentNovelId())
+                .map(Novel::getTitle)
+                .orElse("알 수 없는 소설");
+
         List<MentoringDetailResponse.FeedbackInfo> feedbacks = mentorFeedbackRepository
                 .findAllByMentorshipIdOrderByCreatedAtAsc(mentoringId)
                 .stream()
                 .map(MentoringDetailResponse.FeedbackInfo::from)
                 .toList();
 
-        return MentoringDetailResponse.of(mentorship, mentorName, menteeName, feedbacks);
+        return MentoringDetailResponse.of(mentorship, mentorName, menteeName, novelTitle, feedbacks);
     }
 
-    @Transactional
-    public MentoringFeedbackResponse createFeedback(Long mentoringId, Long userId,
-                                                    MentoringFeedbackRequest request) {
+    /**
+     * V2 - 멘토링 상세 조회
+     * soft-delete 적용 (findByIdAndIsDeletedFalse 사용) — 삭제된 소설 제목 노출 방지
+     */
+    public MentoringDetailResponse getMentoringDetailV2(Long mentoringId, Long userId) {
         Mentor mentor = mentorRepository.findByUserId(userId)
                 .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
 
@@ -198,12 +234,100 @@ public class MentoringService {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_UNAUTHORIZED);
         }
 
+        String mentorName = userRepository.findByIdAndIsDeletedFalse(userId)
+                .map(User::getNickname)
+                .orElse("알 수 없는 사용자");
+
+        String menteeName = userRepository.findByIdAndIsDeletedFalse(mentorship.getMenteeId())
+                .map(User::getNickname)
+                .orElse("알 수 없는 사용자");
+
+        // V2: soft-delete 적용 — 삭제된 소설은 "알 수 없는 소설" 반환
+        String novelTitle = novelRepository.findByIdAndIsDeletedFalse(mentorship.getCurrentNovelId())
+                .map(Novel::getTitle)
+                .orElse("알 수 없는 소설");
+
+        List<MentoringDetailResponse.FeedbackInfo> feedbacks = mentorFeedbackRepository
+                .findAllByMentorshipIdOrderByCreatedAtAsc(mentoringId)
+                .stream()
+                .map(MentoringDetailResponse.FeedbackInfo::from)
+                .toList();
+
+        return MentoringDetailResponse.of(mentorship, mentorName, menteeName, novelTitle, feedbacks);
+    }
+
+    // =====================================================================
+    // createFeedback
+    // =====================================================================
+
+    /**
+     * V1 - 멘토링 피드백 작성
+     * 동시성 보호 없음 (일반 findById 사용)
+     */
+    @Transactional
+    public MentoringFeedbackResponse createFeedback(Long mentoringId, Long userId,
+                                                    MentoringFeedbackRequest request) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        // V1: 동시성 보호 없음 — 동시 요청 시 같은 sessionNumber 중복 저장 가능
+        Mentorship mentorship = mentorshipRepository.findById(mentoringId)
+                .orElseThrow(() -> new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_FOUND));
+
+        if (!mentorship.getMentorId().equals(mentor.getId())) {
+            throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_UNAUTHORIZED);
+        }
         if (mentorship.getStatus() != MentorshipStatus.ACCEPTED) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_FEEDBACK_ONLY_ACCEPTED);
         }
 
-        MentorFeedback feedback = MentorFeedback.create(mentoringId, mentor.getId(), request.content());
+        int nextSession = mentorship.getTotalSessions() + 1;
+
+        MentorFeedback feedback = MentorFeedback.create(
+                mentoringId, mentor.getId(),
+                request.title(), nextSession, request.content()
+        );
         mentorFeedbackRepository.save(feedback);
+        mentorship.increaseSession();
+
+        return MentoringFeedbackResponse.from(feedback);
+    }
+
+    /**
+     * V2 - 멘토링 피드백 작성
+     * 비관적 락(findByIdWithLock) + 유니크 제약으로 sessionNumber 동시성 보호
+     */
+    @Transactional
+    public MentoringFeedbackResponse createFeedbackV2(Long mentoringId, Long userId,
+                                                      MentoringFeedbackRequest request) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        // V2: 비관적 락 — 동시 요청 직렬화로 sessionNumber 중복 방지
+        Mentorship mentorship = mentorshipRepository.findByIdWithLock(mentoringId)
+                .orElseThrow(() -> new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_FOUND));
+
+        if (!mentorship.getMentorId().equals(mentor.getId())) {
+            throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_UNAUTHORIZED);
+        }
+        if (mentorship.getStatus() != MentorshipStatus.ACCEPTED) {
+            throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_FEEDBACK_ONLY_ACCEPTED);
+        }
+
+        int nextSession = mentorship.getTotalSessions() + 1;
+
+        MentorFeedback feedback = MentorFeedback.create(
+                mentoringId, mentor.getId(),
+                request.title(), nextSession, request.content()
+        );
+
+        try {
+            mentorFeedbackRepository.save(feedback);
+        } catch (DataIntegrityViolationException e) {
+            // V2: 유니크 제약 충돌 — 동시 요청으로 같은 회차 저장 시도 방어
+            throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_SESSION_CONFLICT);
+        }
+
         mentorship.increaseSession();
 
         return MentoringFeedbackResponse.from(feedback);

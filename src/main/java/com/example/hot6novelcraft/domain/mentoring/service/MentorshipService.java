@@ -67,12 +67,11 @@ public class MentorshipService {
 
         // 멘토링 신청 생성
         Mentorship mentorship = Mentorship.create(
-                request.mentorId(),
+                mentor.getId(),
                 menteeId,
                 request.currentNovelId(),
                 request.motivation(),
-                request.manuscriptUrl(),
-                null
+                request.manuscriptUrl()
         );
 
         Mentorship saved = mentorshipRepository.save(mentorship);

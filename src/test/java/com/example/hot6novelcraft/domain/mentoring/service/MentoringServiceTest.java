@@ -48,7 +48,7 @@ import static org.mockito.Mockito.*;
 class MentoringServiceTest {
 
     @InjectMocks
-    private MentoringService mentoringService;
+    private MentoringServiceV1 mentoringServiceV1;
 
     @Mock private MentorFeedbackRepository mentorFeedbackRepository;
     @Mock private MentorshipRepository mentorshipRepository;
@@ -56,15 +56,13 @@ class MentoringServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private NovelRepository novelRepository;
 
-    // ───────────────────────────── 상수 ─────────────────────────────
-    private static final Long USER_ID        = 1L;   // mentor의 userId (findByUserId 인자)
-    private static final Long MENTOR_ENTITY_ID = 5L; // Mentor 엔티티 PK
-    private static final Long MENTEE_ID      = 501L;
-    private static final Long MENTORING_ID   = 10L;
-    private static final Long NOVEL_ID       = 100L;
-    private static final Long OTHER_USER_ID  = 999L; // 권한 없는 유저
+    private static final Long USER_ID          = 1L;
+    private static final Long MENTOR_ENTITY_ID = 5L;
+    private static final Long MENTEE_ID        = 501L;
+    private static final Long MENTORING_ID     = 10L;
+    private static final Long NOVEL_ID         = 100L;
+    private static final Long OTHER_USER_ID    = 999L;
 
-    // ───────────────────────────── 픽스처 ─────────────────────────────
     private Mentorship mentorship;
     private Mentor mentor;
     private User mentorUser;
@@ -73,14 +71,13 @@ class MentoringServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Mentorship 생성 (mentorId = MENTOR_ENTITY_ID, menteeId = MENTEE_ID)
+        // title 제거 — Mentorship.create() 시그니처 변경 반영
         mentorship = Mentorship.create(
                 MENTOR_ENTITY_ID, MENTEE_ID, NOVEL_ID,
-                "신청 동기입니다", "https://s3.amazonaws.com/file.pdf", "자바 백엔드 로드맵"
+                "신청 동기입니다", "https://s3.amazonaws.com/file.pdf"
         );
         setField(mentorship, "id", MENTORING_ID);
 
-        // Mentor 생성 (userId = USER_ID)
         mentor = Mentor.create(
                 USER_ID, CareerLevel.INTRODUCTION,
                 "[\"판타지\"]", "[\"문장력\"]", "[\"꼼꼼한 피드백형\"]",
@@ -97,7 +94,6 @@ class MentoringServiceTest {
         novel = Novel.createNovel(USER_ID, "자바 백엔드 로드맵", "설명", "판타지", "태그");
     }
 
-    // Reflection 유틸
     private void setField(Object target, String fieldName, Object value) {
         try {
             java.lang.reflect.Field field = target.getClass().getDeclaredField(fieldName);
@@ -111,6 +107,7 @@ class MentoringServiceTest {
     // ─────────────────────────────────────────────────────────────────
     // getReceivedMentorings
     // ─────────────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("내 멘토링 접수 목록 조회")
     class GetReceivedMentoringsTest {
@@ -126,7 +123,7 @@ class MentoringServiceTest {
             given(novelRepository.findById(NOVEL_ID)).willReturn(Optional.of(novel));
 
             Page<MentoringReceivedResponse> result =
-                    mentoringService.getReceivedMentorings(USER_ID, PageRequest.of(0, 10));
+                    mentoringServiceV1.getReceivedMentorings(USER_ID, PageRequest.of(0, 10));
 
             assertThat(result.getContent()).hasSize(1);
             assertThat(result.getContent().get(0).menteeName()).isEqualTo("홍길동");
@@ -145,7 +142,7 @@ class MentoringServiceTest {
             given(novelRepository.findById(NOVEL_ID)).willReturn(Optional.of(novel));
 
             Page<MentoringReceivedResponse> result =
-                    mentoringService.getReceivedMentorings(USER_ID, PageRequest.of(0, 10));
+                    mentoringServiceV1.getReceivedMentorings(USER_ID, PageRequest.of(0, 10));
 
             assertThat(result.getContent().get(0).menteeName()).isEqualTo("알 수 없는 사용자");
         }
@@ -161,7 +158,7 @@ class MentoringServiceTest {
             given(novelRepository.findById(NOVEL_ID)).willReturn(Optional.empty());
 
             Page<MentoringReceivedResponse> result =
-                    mentoringService.getReceivedMentorings(USER_ID, PageRequest.of(0, 10));
+                    mentoringServiceV1.getReceivedMentorings(USER_ID, PageRequest.of(0, 10));
 
             assertThat(result.getContent().get(0).title()).isEqualTo("알 수 없는 소설");
         }
@@ -174,7 +171,7 @@ class MentoringServiceTest {
                     .willReturn(new PageImpl<>(List.of()));
 
             Page<MentoringReceivedResponse> result =
-                    mentoringService.getReceivedMentorings(USER_ID, PageRequest.of(0, 10));
+                    mentoringServiceV1.getReceivedMentorings(USER_ID, PageRequest.of(0, 10));
 
             assertThat(result.getContent()).isEmpty();
         }
@@ -184,7 +181,7 @@ class MentoringServiceTest {
         void getReceivedMentorings_mentor_not_found_throws() {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.getReceivedMentorings(USER_ID, PageRequest.of(0, 10)))
+            assertThatThrownBy(() -> mentoringServiceV1.getReceivedMentorings(USER_ID, PageRequest.of(0, 10)))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
@@ -193,6 +190,7 @@ class MentoringServiceTest {
     // ─────────────────────────────────────────────────────────────────
     // acceptMentee
     // ─────────────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("멘티 수락")
     class AcceptMenteeTest {
@@ -203,10 +201,10 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            mentoringService.acceptMentee(MENTORING_ID, MENTEE_ID, USER_ID);
+            mentoringServiceV1.acceptMentee(MENTORING_ID, MENTEE_ID, USER_ID);
 
             assertThat(mentorship.getStatus()).isEqualTo(MentorshipStatus.ACCEPTED);
-            assertThat(mentor.getMaxMentees()).isEqualTo(2); // 3 - 1
+            assertThat(mentor.getMaxMentees()).isEqualTo(2);
         }
 
         @Test
@@ -214,7 +212,7 @@ class MentoringServiceTest {
         void acceptMentee_mentor_not_found_throws() {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.acceptMentee(MENTORING_ID, MENTEE_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.acceptMentee(MENTORING_ID, MENTEE_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
@@ -225,7 +223,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.acceptMentee(MENTORING_ID, MENTEE_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.acceptMentee(MENTORING_ID, MENTEE_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_NOT_FOUND.getMessage());
         }
@@ -233,17 +231,16 @@ class MentoringServiceTest {
         @Test
         @DisplayName("권한이 없으면 예외 발생")
         void acceptMentee_unauthorized_throws() {
-            // OTHER_USER_ID로 조회 시 mentor 엔티티는 반환되지만 mentorId가 다름
             Mentor otherMentor = Mentor.create(
                     OTHER_USER_ID, CareerLevel.INTRODUCTION,
                     "[]", "[]", "[]", "소개", null, 3, true, "설명", null, MentorStatus.APPROVED
             );
-            setField(otherMentor, "id", 999L); // MENTOR_ENTITY_ID와 다른 ID
+            setField(otherMentor, "id", 999L);
 
             given(mentorRepository.findByUserId(OTHER_USER_ID)).willReturn(Optional.of(otherMentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.acceptMentee(MENTORING_ID, MENTEE_ID, OTHER_USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.acceptMentee(MENTORING_ID, MENTEE_ID, OTHER_USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_UNAUTHORIZED.getMessage());
         }
@@ -254,7 +251,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.acceptMentee(MENTORING_ID, 999L, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.acceptMentee(MENTORING_ID, 999L, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_MENTEE_NOT_MATCH.getMessage());
         }
@@ -266,7 +263,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.acceptMentee(MENTORING_ID, MENTEE_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.acceptMentee(MENTORING_ID, MENTEE_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_ALREADY_PROCESSED.getMessage());
         }
@@ -275,6 +272,7 @@ class MentoringServiceTest {
     // ─────────────────────────────────────────────────────────────────
     // rejectMentee
     // ─────────────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("멘티 거절")
     class RejectMenteeTest {
@@ -285,7 +283,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            mentoringService.rejectMentee(MENTORING_ID, MENTEE_ID, USER_ID);
+            mentoringServiceV1.rejectMentee(MENTORING_ID, MENTEE_ID, USER_ID);
 
             assertThat(mentorship.getStatus()).isEqualTo(MentorshipStatus.REJECTED);
         }
@@ -295,7 +293,7 @@ class MentoringServiceTest {
         void rejectMentee_mentor_not_found_throws() {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.rejectMentee(MENTORING_ID, MENTEE_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.rejectMentee(MENTORING_ID, MENTEE_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
@@ -306,7 +304,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.rejectMentee(MENTORING_ID, MENTEE_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.rejectMentee(MENTORING_ID, MENTEE_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_NOT_FOUND.getMessage());
         }
@@ -323,7 +321,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(OTHER_USER_ID)).willReturn(Optional.of(otherMentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.rejectMentee(MENTORING_ID, MENTEE_ID, OTHER_USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.rejectMentee(MENTORING_ID, MENTEE_ID, OTHER_USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_UNAUTHORIZED.getMessage());
         }
@@ -334,7 +332,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.rejectMentee(MENTORING_ID, 999L, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.rejectMentee(MENTORING_ID, 999L, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_MENTEE_NOT_MATCH.getMessage());
         }
@@ -346,7 +344,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.rejectMentee(MENTORING_ID, MENTEE_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.rejectMentee(MENTORING_ID, MENTEE_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_ALREADY_PROCESSED.getMessage());
         }
@@ -355,6 +353,7 @@ class MentoringServiceTest {
     // ─────────────────────────────────────────────────────────────────
     // getManuscriptDownloadUrl
     // ─────────────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("원고 다운로드 URL 조회")
     class GetManuscriptDownloadUrlTest {
@@ -365,7 +364,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            String url = mentoringService.getManuscriptDownloadUrl(MENTORING_ID, USER_ID);
+            String url = mentoringServiceV1.getManuscriptDownloadUrl(MENTORING_ID, USER_ID);
 
             assertThat(url).isEqualTo("https://s3.amazonaws.com/file.pdf");
             assertThat(mentorship.getManuscriptDownloadCount()).isEqualTo(1);
@@ -376,7 +375,7 @@ class MentoringServiceTest {
         void getManuscriptDownloadUrl_mentor_not_found_throws() {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.getManuscriptDownloadUrl(MENTORING_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.getManuscriptDownloadUrl(MENTORING_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
@@ -387,7 +386,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.getManuscriptDownloadUrl(MENTORING_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.getManuscriptDownloadUrl(MENTORING_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_NOT_FOUND.getMessage());
         }
@@ -404,7 +403,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(OTHER_USER_ID)).willReturn(Optional.of(otherMentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.getManuscriptDownloadUrl(MENTORING_ID, OTHER_USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.getManuscriptDownloadUrl(MENTORING_ID, OTHER_USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_UNAUTHORIZED.getMessage());
         }
@@ -412,15 +411,16 @@ class MentoringServiceTest {
         @Test
         @DisplayName("원고 URL이 없으면 예외 발생")
         void getManuscriptDownloadUrl_manuscript_not_found_throws() {
+            // title 제거 — Mentorship.create() 시그니처 변경 반영
             Mentorship noFileMentorship = Mentorship.create(
-                    MENTOR_ENTITY_ID, MENTEE_ID, NOVEL_ID, "신청 동기", null, "타이틀"
+                    MENTOR_ENTITY_ID, MENTEE_ID, NOVEL_ID, "신청 동기", null
             );
             setField(noFileMentorship, "id", MENTORING_ID);
 
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(noFileMentorship));
 
-            assertThatThrownBy(() -> mentoringService.getManuscriptDownloadUrl(MENTORING_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.getManuscriptDownloadUrl(MENTORING_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_MANUSCRIPT_NOT_FOUND.getMessage());
         }
@@ -429,6 +429,7 @@ class MentoringServiceTest {
     // ─────────────────────────────────────────────────────────────────
     // completeMentoring
     // ─────────────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("멘토링 종료")
     class CompleteMentoringTest {
@@ -437,14 +438,14 @@ class MentoringServiceTest {
         @DisplayName("정상 종료 - 슬롯 반환 및 상태 변경")
         void completeMentoring_success() {
             mentorship.approve();
-            mentor.decreaseSlot(); // 수락 시점 슬롯 차감 반영 (3 → 2)
+            mentor.decreaseSlot();
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            mentoringService.completeMentoring(MENTORING_ID, USER_ID);
+            mentoringServiceV1.completeMentoring(MENTORING_ID, USER_ID);
 
             assertThat(mentorship.getStatus()).isEqualTo(MentorshipStatus.COMPLETED);
-            assertThat(mentor.getMaxMentees()).isEqualTo(3); // 2 + 1 → 원래값으로 복구
+            assertThat(mentor.getMaxMentees()).isEqualTo(3);
         }
 
         @Test
@@ -452,7 +453,7 @@ class MentoringServiceTest {
         void completeMentoring_mentor_not_found_throws() {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.completeMentoring(MENTORING_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.completeMentoring(MENTORING_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
@@ -463,7 +464,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.completeMentoring(MENTORING_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.completeMentoring(MENTORING_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_NOT_FOUND.getMessage());
         }
@@ -480,7 +481,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(OTHER_USER_ID)).willReturn(Optional.of(otherMentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.completeMentoring(MENTORING_ID, OTHER_USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.completeMentoring(MENTORING_ID, OTHER_USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_UNAUTHORIZED.getMessage());
         }
@@ -488,11 +489,10 @@ class MentoringServiceTest {
         @Test
         @DisplayName("진행 중이 아닌 멘토링 종료 시 예외 발생")
         void completeMentoring_not_accepted_throws() {
-            // mentorship 상태가 PENDING이므로 ACCEPTED 아님
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.completeMentoring(MENTORING_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.completeMentoring(MENTORING_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_NOT_ACCEPTED.getMessage());
         }
@@ -501,6 +501,7 @@ class MentoringServiceTest {
     // ─────────────────────────────────────────────────────────────────
     // getMentoringDetail
     // ─────────────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("멘토링 상세 정보 조회")
     class GetMentoringDetailTest {
@@ -508,21 +509,28 @@ class MentoringServiceTest {
         @Test
         @DisplayName("정상 조회 - 멘토링 상세 정보 반환")
         void getMentoringDetail_success() {
-            MentorFeedback feedback = MentorFeedback.create(MENTORING_ID, MENTOR_ENTITY_ID, "ERD 설계 및 API 명세 작성");
+            // MentorFeedback.create() 시그니처 변경 반영 — title, sessionNumber 추가
+            MentorFeedback feedback = MentorFeedback.create(
+                    MENTORING_ID, MENTOR_ENTITY_ID, "1회차 피드백", 1, "ERD 설계 및 API 명세 작성"
+            );
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
             given(userRepository.findByIdAndIsDeletedFalse(USER_ID)).willReturn(Optional.of(mentorUser));
             given(userRepository.findByIdAndIsDeletedFalse(MENTEE_ID)).willReturn(Optional.of(menteeUser));
+            given(novelRepository.findById(NOVEL_ID)).willReturn(Optional.of(novel));   // novelTitle 조회 추가
             given(mentorFeedbackRepository.findAllByMentorshipIdOrderByCreatedAtAsc(MENTORING_ID))
                     .willReturn(List.of(feedback));
 
-            MentoringDetailResponse response = mentoringService.getMentoringDetail(MENTORING_ID, USER_ID);
+            MentoringDetailResponse response = mentoringServiceV1.getMentoringDetail(MENTORING_ID, USER_ID);
 
             assertThat(response).isNotNull();
+            assertThat(response.novelTitle()).isEqualTo("자바 백엔드 로드맵");   // title → novelTitle
             assertThat(response.mentorName()).isEqualTo("김철수");
             assertThat(response.menteeName()).isEqualTo("홍길동");
             assertThat(response.status()).isEqualTo(MentorshipStatus.PENDING);
             assertThat(response.feedbacks()).hasSize(1);
+            assertThat(response.feedbacks().get(0).title()).isEqualTo("1회차 피드백");
+            assertThat(response.feedbacks().get(0).sessionNumber()).isEqualTo(1);
             assertThat(response.feedbacks().get(0).content()).isEqualTo("ERD 설계 및 API 명세 작성");
         }
 
@@ -533,10 +541,11 @@ class MentoringServiceTest {
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
             given(userRepository.findByIdAndIsDeletedFalse(USER_ID)).willReturn(Optional.of(mentorUser));
             given(userRepository.findByIdAndIsDeletedFalse(MENTEE_ID)).willReturn(Optional.of(menteeUser));
+            given(novelRepository.findById(NOVEL_ID)).willReturn(Optional.of(novel));   // 추가
             given(mentorFeedbackRepository.findAllByMentorshipIdOrderByCreatedAtAsc(MENTORING_ID))
                     .willReturn(List.of());
 
-            MentoringDetailResponse response = mentoringService.getMentoringDetail(MENTORING_ID, USER_ID);
+            MentoringDetailResponse response = mentoringServiceV1.getMentoringDetail(MENTORING_ID, USER_ID);
 
             assertThat(response.feedbacks()).isEmpty();
             assertThat(response.totalSessions()).isEqualTo(0);
@@ -549,10 +558,11 @@ class MentoringServiceTest {
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
             given(userRepository.findByIdAndIsDeletedFalse(USER_ID)).willReturn(Optional.empty());
             given(userRepository.findByIdAndIsDeletedFalse(MENTEE_ID)).willReturn(Optional.of(menteeUser));
+            given(novelRepository.findById(NOVEL_ID)).willReturn(Optional.of(novel));   // 추가
             given(mentorFeedbackRepository.findAllByMentorshipIdOrderByCreatedAtAsc(MENTORING_ID))
                     .willReturn(List.of());
 
-            MentoringDetailResponse response = mentoringService.getMentoringDetail(MENTORING_ID, USER_ID);
+            MentoringDetailResponse response = mentoringServiceV1.getMentoringDetail(MENTORING_ID, USER_ID);
 
             assertThat(response.mentorName()).isEqualTo("알 수 없는 사용자");
         }
@@ -564,10 +574,11 @@ class MentoringServiceTest {
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
             given(userRepository.findByIdAndIsDeletedFalse(USER_ID)).willReturn(Optional.of(mentorUser));
             given(userRepository.findByIdAndIsDeletedFalse(MENTEE_ID)).willReturn(Optional.empty());
+            given(novelRepository.findById(NOVEL_ID)).willReturn(Optional.of(novel));   // 추가
             given(mentorFeedbackRepository.findAllByMentorshipIdOrderByCreatedAtAsc(MENTORING_ID))
                     .willReturn(List.of());
 
-            MentoringDetailResponse response = mentoringService.getMentoringDetail(MENTORING_ID, USER_ID);
+            MentoringDetailResponse response = mentoringServiceV1.getMentoringDetail(MENTORING_ID, USER_ID);
 
             assertThat(response.menteeName()).isEqualTo("알 수 없는 사용자");
         }
@@ -577,7 +588,7 @@ class MentoringServiceTest {
         void getMentoringDetail_mentor_not_found_throws() {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.getMentoringDetail(MENTORING_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.getMentoringDetail(MENTORING_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
@@ -588,7 +599,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.getMentoringDetail(MENTORING_ID, USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.getMentoringDetail(MENTORING_ID, USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_NOT_FOUND.getMessage());
         }
@@ -605,7 +616,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(OTHER_USER_ID)).willReturn(Optional.of(otherMentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.getMentoringDetail(MENTORING_ID, OTHER_USER_ID))
+            assertThatThrownBy(() -> mentoringServiceV1.getMentoringDetail(MENTORING_ID, OTHER_USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_UNAUTHORIZED.getMessage());
         }
@@ -614,6 +625,7 @@ class MentoringServiceTest {
     // ─────────────────────────────────────────────────────────────────
     // createFeedback
     // ─────────────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("멘토링 피드백 작성")
     class CreateFeedbackTest {
@@ -622,36 +634,49 @@ class MentoringServiceTest {
         @DisplayName("정상 피드백 작성 - 세션 증가 및 피드백 저장")
         void createFeedback_success() {
             mentorship.approve();
-            MentoringFeedbackRequest request = new MentoringFeedbackRequest("ERD 설계 및 API 명세 작성");
-            MentorFeedback feedback = MentorFeedback.create(MENTORING_ID, MENTOR_ENTITY_ID, "ERD 설계 및 API 명세 작성");
+
+            // title 추가
+            MentoringFeedbackRequest request = new MentoringFeedbackRequest(
+                    "1회차 피드백",
+                    "ERD 설계 및 API 명세 작성"
+            );
+            // MentorFeedback.create() 시그니처 변경 반영 — title, sessionNumber 추가
+            MentorFeedback feedback = MentorFeedback.create(
+                    MENTORING_ID, MENTOR_ENTITY_ID, "1회차 피드백", 1, "ERD 설계 및 API 명세 작성"
+            );
 
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
             given(mentorFeedbackRepository.save(any())).willReturn(feedback);
 
             MentoringFeedbackResponse response =
-                    mentoringService.createFeedback(MENTORING_ID, USER_ID, request);
+                    mentoringServiceV1.createFeedback(MENTORING_ID, USER_ID, request);
 
-            // ArgumentCaptor로 실제 저장된 엔티티 검증
             ArgumentCaptor<MentorFeedback> captor = ArgumentCaptor.forClass(MentorFeedback.class);
             verify(mentorFeedbackRepository, times(1)).save(captor.capture());
             MentorFeedback saved = captor.getValue();
 
             assertThat(response).isNotNull();
+            assertThat(response.title()).isEqualTo("1회차 피드백");
+            assertThat(response.sessionNumber()).isEqualTo(1);
             assertThat(response.content()).isEqualTo("ERD 설계 및 API 명세 작성");
             assertThat(mentorship.getTotalSessions()).isEqualTo(1);
-            assertThat(saved.getMentorshipId()).isEqualTo(MENTORING_ID);   // 잘못된 mentoringId 방지
-            assertThat(saved.getAuthorId()).isEqualTo(MENTOR_ENTITY_ID);   // 잘못된 mentorId 방지
+            assertThat(saved.getMentorshipId()).isEqualTo(MENTORING_ID);
+            assertThat(saved.getAuthorId()).isEqualTo(MENTOR_ENTITY_ID);
+            assertThat(saved.getTitle()).isEqualTo("1회차 피드백");
+            assertThat(saved.getSessionNumber()).isEqualTo(1);
             assertThat(saved.getContent()).isEqualTo("ERD 설계 및 API 명세 작성");
         }
 
         @Test
         @DisplayName("멘토 프로필이 없으면 예외 발생")
         void createFeedback_mentor_not_found_throws() {
-            MentoringFeedbackRequest request = new MentoringFeedbackRequest("ERD 설계 및 API 명세 작성");
+            MentoringFeedbackRequest request = new MentoringFeedbackRequest(
+                    "1회차 피드백", "ERD 설계 및 API 명세 작성"
+            );
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.createFeedback(MENTORING_ID, USER_ID, request))
+            assertThatThrownBy(() -> mentoringServiceV1.createFeedback(MENTORING_ID, USER_ID, request))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
@@ -659,11 +684,13 @@ class MentoringServiceTest {
         @Test
         @DisplayName("멘토링이 없으면 예외 발생")
         void createFeedback_mentoring_not_found_throws() {
-            MentoringFeedbackRequest request = new MentoringFeedbackRequest("ERD 설계 및 API 명세 작성");
+            MentoringFeedbackRequest request = new MentoringFeedbackRequest(
+                    "1회차 피드백", "ERD 설계 및 API 명세 작성"
+            );
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> mentoringService.createFeedback(MENTORING_ID, USER_ID, request))
+            assertThatThrownBy(() -> mentoringServiceV1.createFeedback(MENTORING_ID, USER_ID, request))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_NOT_FOUND.getMessage());
         }
@@ -671,7 +698,9 @@ class MentoringServiceTest {
         @Test
         @DisplayName("권한이 없으면 예외 발생")
         void createFeedback_unauthorized_throws() {
-            MentoringFeedbackRequest request = new MentoringFeedbackRequest("ERD 설계 및 API 명세 작성");
+            MentoringFeedbackRequest request = new MentoringFeedbackRequest(
+                    "1회차 피드백", "ERD 설계 및 API 명세 작성"
+            );
             Mentor otherMentor = Mentor.create(
                     OTHER_USER_ID, CareerLevel.INTRODUCTION,
                     "[]", "[]", "[]", "소개", null, 3, true, "설명", null, MentorStatus.APPROVED
@@ -681,7 +710,7 @@ class MentoringServiceTest {
             given(mentorRepository.findByUserId(OTHER_USER_ID)).willReturn(Optional.of(otherMentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.createFeedback(MENTORING_ID, OTHER_USER_ID, request))
+            assertThatThrownBy(() -> mentoringServiceV1.createFeedback(MENTORING_ID, OTHER_USER_ID, request))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_UNAUTHORIZED.getMessage());
         }
@@ -689,12 +718,13 @@ class MentoringServiceTest {
         @Test
         @DisplayName("진행 중이 아닌 멘토링에 피드백 작성 시 예외 발생")
         void createFeedback_not_accepted_throws() {
-            // mentorship 상태가 PENDING이므로 ACCEPTED 아님
-            MentoringFeedbackRequest request = new MentoringFeedbackRequest("ERD 설계 및 API 명세 작성");
+            MentoringFeedbackRequest request = new MentoringFeedbackRequest(
+                    "1회차 피드백", "ERD 설계 및 API 명세 작성"
+            );
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
-            assertThatThrownBy(() -> mentoringService.createFeedback(MENTORING_ID, USER_ID, request))
+            assertThatThrownBy(() -> mentoringServiceV1.createFeedback(MENTORING_ID, USER_ID, request))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentoringExceptionEnum.MENTORING_FEEDBACK_ONLY_ACCEPTED.getMessage());
         }
