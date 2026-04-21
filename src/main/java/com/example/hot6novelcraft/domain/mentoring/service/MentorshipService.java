@@ -91,7 +91,7 @@ public class MentorshipService {
 
         // 작가 권한 확인
         User mentee = userRepository.findById(menteeId)
-                .orElseThrow(() -> new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_FOUND));
+                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
 
         if (mentee.getRole() != UserRole.AUTHOR) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_AUTHOR);

@@ -1,7 +1,9 @@
 package com.example.hot6novelcraft.domain.mentoring.service;
 
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
+import com.example.hot6novelcraft.common.exception.domain.MentorExceptionEnum;
 import com.example.hot6novelcraft.common.exception.domain.MentoringExceptionEnum;
+import com.example.hot6novelcraft.common.exception.domain.UserExceptionEnum;
 import com.example.hot6novelcraft.domain.file.service.FileUploadService;
 import com.example.hot6novelcraft.domain.mentor.entity.Mentor;
 import com.example.hot6novelcraft.domain.mentor.entity.enums.MentorStatus;
@@ -206,7 +208,7 @@ class MentorshipServiceTest {
 
             assertThatThrownBy(() -> mentorshipService.applyMentorship(MENTEE_ID, request))
                     .isInstanceOf(ServiceErrorException.class)
-                    .hasMessage(MentoringExceptionEnum.MENTORING_NOT_FOUND.getMessage());
+                    .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
     }
 
@@ -263,7 +265,7 @@ class MentorshipServiceTest {
 
             assertThatThrownBy(() -> mentorshipService.uploadManuscript(file, MENTEE_ID))
                     .isInstanceOf(ServiceErrorException.class)
-                    .hasMessage(MentoringExceptionEnum.MENTORING_NOT_FOUND.getMessage());
+                    .hasMessage(UserExceptionEnum.ERR_NOT_FOUND_USER.getMessage());
         }
     }
 }
