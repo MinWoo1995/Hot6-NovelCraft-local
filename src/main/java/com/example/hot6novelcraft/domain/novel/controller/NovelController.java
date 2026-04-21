@@ -156,4 +156,29 @@ public class NovelController {
                 BaseResponse.success("200", "소설 랭킹 조회 성공", responses)
         );
     }
+
+    /**
+     * 신작용 소설 목록 조회 V2 (메인 페이지 사용)
+     * 한 달 신작 리스트
+     * 서하나
+     */
+    @GetMapping(value = "/novels", params = "type=new")
+    public ResponseEntity<BaseResponse<List<NovelListResponse>>> getNewNovelList(
+            @RequestParam(required = false) String genre,
+            @RequestParam(required = false) NovelStatus status,
+            @RequestParam(defaultValue = "50") int limit // 기본 50개 리스트
+    ) {
+        // limit 값 최대 100개
+        if(limit > 100) {
+            limit = 100;
+        }
+        if(limit < 1) {
+            limit = 1;
+        }
+        List<NovelListResponse> response = novelService.getNewNovelList(genre, status, limit);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "신작 소설 목록 조회 성공", response)
+        );
+    }
 }
