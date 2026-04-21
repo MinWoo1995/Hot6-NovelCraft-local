@@ -6,8 +6,12 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+// V2: (mentorship_id, session_number) 유니크 제약 추가 — 동시성 이슈 방어
 @Entity
-@Table(name = "mentorship_feedbacks")
+@Table(
+        name = "mentorship_feedbacks",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"mentorship_id", "session_number"})
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MentorFeedback extends BaseEntity {
@@ -17,21 +21,31 @@ public class MentorFeedback extends BaseEntity {
     private Long id;
 
     @Column(nullable = false)
-    private Long mentorshipId; // 멘토링 아이디 참조
+    private Long mentorshipId;
 
     @Column(nullable = false)
-    private Long authorId; // 작성자 회원 아이디
+    private Long authorId;
+
+    @Column(length = 200, nullable = false)
+    private String title;
+
+    @Column(nullable = false)
+    private int sessionNumber;
 
     @Column(columnDefinition = "TEXT", nullable = false)
-    private String content; // 피드백 내용
+    private String content;
 
-    private MentorFeedback(Long mentorshipId, Long authorId, String content) {
-        this.mentorshipId = mentorshipId;
-        this.authorId = authorId;
-        this.content = content;
+    private MentorFeedback(Long mentorshipId, Long authorId, String title,
+                           int sessionNumber, String content) {
+        this.mentorshipId  = mentorshipId;
+        this.authorId      = authorId;
+        this.title         = title;
+        this.sessionNumber = sessionNumber;
+        this.content       = content;
     }
 
-    public static MentorFeedback create(Long mentorshipId, Long authorId, String content) {
-        return new MentorFeedback(mentorshipId, authorId, content);
+    public static MentorFeedback create(Long mentorshipId, Long authorId, String title,
+                                        int sessionNumber, String content) {
+        return new MentorFeedback(mentorshipId, authorId, title, sessionNumber, content);
     }
 }
