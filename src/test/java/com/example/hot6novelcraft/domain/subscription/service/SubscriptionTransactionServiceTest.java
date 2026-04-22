@@ -85,10 +85,12 @@ class SubscriptionTransactionServiceTest {
     class ValidateNotSubscribedTest {
 
         @Test
-        @DisplayName("성공 - ACTIVE 구독이 없으면 통과")
-        void validateNotSubscribed_noActiveSubscription_success() {
+        @DisplayName("성공 - ACTIVE와 PENDING 구독이 모두 없으면 통과")
+        void validateNotSubscribed_noActiveOrPendingSubscription_success() {
             // given
             given(subscriptionRepository.findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.ACTIVE))
+                    .willReturn(Optional.empty());
+            given(subscriptionRepository.findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.PENDING))
                     .willReturn(Optional.empty());
 
             // when & then (예외 없어야 함)
@@ -96,6 +98,8 @@ class SubscriptionTransactionServiceTest {
 
             verify(subscriptionRepository, times(1))
                     .findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.ACTIVE);
+            verify(subscriptionRepository, times(1))
+                    .findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.PENDING);
         }
 
         @Test
@@ -110,6 +114,32 @@ class SubscriptionTransactionServiceTest {
             assertThatThrownBy(() -> transactionService.validateNotSubscribed(USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(SubscriptionExceptionEnum.ERR_ALREADY_SUBSCRIBED.getMessage());
+
+            verify(subscriptionRepository, times(1))
+                    .findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.ACTIVE);
+            verify(subscriptionRepository, never())
+                    .findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("실패 - PENDING 구독이 있으면 ERR_ALREADY_SUBSCRIBED")
+        void validateNotSubscribed_pendingSubscriptionExists_throwsException() {
+            // given
+            Subscription pendingSubscription = createMockSubscription(SUBSCRIPTION_ID, USER_ID, SubscriptionStatus.PENDING);
+            given(subscriptionRepository.findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.ACTIVE))
+                    .willReturn(Optional.empty());
+            given(subscriptionRepository.findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.PENDING))
+                    .willReturn(Optional.of(pendingSubscription));
+
+            // when & then
+            assertThatThrownBy(() -> transactionService.validateNotSubscribed(USER_ID))
+                    .isInstanceOf(ServiceErrorException.class)
+                    .hasMessage(SubscriptionExceptionEnum.ERR_ALREADY_SUBSCRIBED.getMessage());
+
+            verify(subscriptionRepository, times(1))
+                    .findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.ACTIVE);
+            verify(subscriptionRepository, times(1))
+                    .findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.PENDING);
         }
     }
 
@@ -219,6 +249,9 @@ class SubscriptionTransactionServiceTest {
             Subscription subscription = createMockSubscription(SUBSCRIPTION_ID, USER_ID, SubscriptionStatus.PENDING);
             given(subscriptionRepository.findBySubscriptionKey(SUBSCRIPTION_KEY))
                     .willReturn(Optional.of(subscription));
+            // Race condition 방어: ACTIVE 구독 없음 확인
+            given(subscriptionRepository.findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.ACTIVE))
+                    .willReturn(Optional.empty());
             given(subscriptionRepository.save(any(Subscription.class))).willReturn(subscription);
 
             // when
@@ -230,6 +263,8 @@ class SubscriptionTransactionServiceTest {
             assertThat(result).isNotNull();
             verify(subscription, times(1)).complete(BILLING_KEY, PAYMENT_ID);
             verify(subscriptionRepository, times(1)).save(subscription);
+            verify(subscriptionRepository, times(1))
+                    .findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.ACTIVE);
         }
 
         @Test
@@ -244,6 +279,32 @@ class SubscriptionTransactionServiceTest {
                     SUBSCRIPTION_KEY, BILLING_KEY, PAYMENT_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_KEY_NOT_FOUND.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패 - 이미 ACTIVE 구독이 있으면 ERR_ALREADY_SUBSCRIBED (Race condition 방어)")
+        void completeSubscription_activeSubscriptionAlreadyExists_throwsException() {
+            // given
+            Long existingSubscriptionId = 999L;
+            Subscription pendingSubscription = createMockSubscription(SUBSCRIPTION_ID, USER_ID, SubscriptionStatus.PENDING);
+            Subscription existingActiveSubscription = createMockSubscription(existingSubscriptionId, USER_ID, SubscriptionStatus.ACTIVE);
+
+            given(subscriptionRepository.findBySubscriptionKey(SUBSCRIPTION_KEY))
+                    .willReturn(Optional.of(pendingSubscription));
+            // Race condition: 다른 PENDING이 먼저 ACTIVE로 전환됨
+            given(subscriptionRepository.findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.ACTIVE))
+                    .willReturn(Optional.of(existingActiveSubscription));
+
+            // when & then
+            assertThatThrownBy(() -> transactionService.completeSubscription(
+                    SUBSCRIPTION_KEY, BILLING_KEY, PAYMENT_ID))
+                    .isInstanceOf(ServiceErrorException.class)
+                    .hasMessage(SubscriptionExceptionEnum.ERR_ALREADY_SUBSCRIBED.getMessage());
+
+            verify(subscriptionRepository, times(1))
+                    .findByUserIdAndSubscriptionStatus(USER_ID, SubscriptionStatus.ACTIVE);
+            verify(pendingSubscription, never()).complete(any(), any());
+            verify(subscriptionRepository, never()).save(pendingSubscription);
         }
     }
 

@@ -257,7 +257,12 @@ public class SubscriptionService {
      * PortOne SDK 0.23.0에 deleteBillingKey 메서드가 없어 REST API를 직접 호출합니다.
      */
     private void deleteBillingKey(String billingKey) {
-        String url = "https://api.portone.io/billing-keys/" + billingKey + "?reason=구독 취소";
+        // URL 쿼리 파라미터 안전하게 인코딩 (한글 "구독 취소" → URL 인코딩)
+        String url = org.springframework.web.util.UriComponentsBuilder
+                .fromHttpUrl("https://api.portone.io/billing-keys/" + billingKey)
+                .queryParam("reason", "구독 취소")
+                .encode()
+                .toUriString();
 
         try {
             // HTTP 헤더 설정
