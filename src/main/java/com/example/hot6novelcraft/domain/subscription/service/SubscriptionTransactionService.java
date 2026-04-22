@@ -1,0 +1,139 @@
+package com.example.hot6novelcraft.domain.subscription.service;
+
+import com.example.hot6novelcraft.common.exception.ServiceErrorException;
+import com.example.hot6novelcraft.common.exception.domain.SubscriptionExceptionEnum;
+import com.example.hot6novelcraft.domain.payment.entity.Payment;
+import com.example.hot6novelcraft.domain.payment.entity.enums.PaymentStatus;
+import com.example.hot6novelcraft.domain.payment.repository.PaymentRepository;
+import com.example.hot6novelcraft.domain.point.service.PointService;
+import com.example.hot6novelcraft.domain.purchases.entity.Purchase;
+import com.example.hot6novelcraft.domain.purchases.entity.enums.PurchaseType;
+import com.example.hot6novelcraft.domain.purchases.repository.PurchaseRepository;
+import com.example.hot6novelcraft.domain.subscription.entity.Subscription;
+import com.example.hot6novelcraft.domain.subscription.entity.enums.PlanType;
+import com.example.hot6novelcraft.domain.subscription.entity.enums.SubscriptionStatus;
+import com.example.hot6novelcraft.domain.subscription.repository.SubscriptionRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class SubscriptionTransactionService {
+
+    private final SubscriptionRepository subscriptionRepository;
+    private final PaymentRepository paymentRepository;
+    private final PurchaseRepository purchaseRepository;
+    private final PointService pointService;
+
+    @Transactional(readOnly = true)
+    public void validateNotSubscribed(Long userId) {
+        Optional<Subscription> activeSubscription = subscriptionRepository
+                .findByUserIdAndSubscriptionStatus(userId, SubscriptionStatus.ACTIVE);
+
+        if (activeSubscription.isPresent()) {
+            throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_ALREADY_SUBSCRIBED);
+        }
+    }
+
+    @Transactional
+    public Subscription prepareSubscription(Long userId, PlanType planType, String subscriptionKey, Long amount) {
+        Subscription subscription = Subscription.prepare(userId, planType, subscriptionKey, amount);
+        return subscriptionRepository.save(subscription);
+    }
+
+    @Transactional(readOnly = true)
+    public Subscription getSubscriptionForComplete(Long userId, String subscriptionKey) {
+        Subscription subscription = subscriptionRepository.findBySubscriptionKey(subscriptionKey)
+                .orElseThrow(() -> new ServiceErrorException(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_KEY_NOT_FOUND));
+
+        // 소유자 검증
+        if (!subscription.getUserId().equals(userId)) {
+            throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_NOT_MY_SUBSCRIPTION);
+        }
+
+        // PENDING 상태 확인
+        if (subscription.getSubscriptionStatus() != SubscriptionStatus.PENDING) {
+            throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_INVALID_SUBSCRIPTION_STATUS);
+        }
+
+        return subscription;
+    }
+
+    @Transactional
+    public Subscription completeSubscription(String subscriptionKey, String billingKey, Long firstPaymentId) {
+        Subscription subscription = subscriptionRepository.findBySubscriptionKey(subscriptionKey)
+                .orElseThrow(() -> new ServiceErrorException(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_KEY_NOT_FOUND));
+
+        subscription.complete(billingKey, firstPaymentId);
+        return subscriptionRepository.save(subscription);
+    }
+
+    @Transactional
+    public Payment createPayment(Long userId, String paymentKey, Long amount) {
+        Payment payment = Payment.create(userId, paymentKey, amount, null);
+        payment.complete(null);  // COMPLETED 상태로 전환
+        return paymentRepository.save(payment);
+    }
+
+
+    @Transactional
+    public void createPurchase(Long userId, Long amount, Long paymentId) {
+        Purchase purchase = Purchase.create(userId, PurchaseType.SUBSCRIPTION, amount, paymentId);
+        purchaseRepository.save(purchase);
+    }
+
+    @Transactional(readOnly = true)
+    public Subscription getSubscriptionForCancel(Long userId, Long subscriptionId) {
+        Subscription subscription = subscriptionRepository.findById(subscriptionId)
+                .orElseThrow(() -> new ServiceErrorException(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_NOT_FOUND));
+
+        // 소유자 검증
+        if (!subscription.getUserId().equals(userId)) {
+            throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_NOT_MY_SUBSCRIPTION);
+        }
+
+        // 이미 취소된 구독인지 확인
+        if (subscription.getSubscriptionStatus() == SubscriptionStatus.CANCELLED) {
+            throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_ALREADY_CANCELLED);
+        }
+
+        return subscription;
+    }
+
+    @Transactional
+    public Subscription cancelSubscription(Long subscriptionId) {
+        Subscription subscription = subscriptionRepository.findById(subscriptionId)
+                .orElseThrow(() -> new ServiceErrorException(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_NOT_FOUND));
+
+        subscription.cancel();
+        return subscriptionRepository.save(subscription);
+    }
+
+    @Transactional
+    public void cancelSubscriptionDueToPaymentFailure(Long subscriptionId, String reason) {
+        Subscription subscription = subscriptionRepository.findById(subscriptionId)
+                .orElseThrow(() -> new ServiceErrorException(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_NOT_FOUND));
+
+        subscription.markPaymentFailed(reason);
+        subscriptionRepository.save(subscription);
+    }
+
+    @Transactional
+    public void updateSubscriptionAfterPayment(String billingKey, Long paymentId) {
+        Subscription subscription = subscriptionRepository.findByBillingKey(billingKey)
+                .orElseThrow(() -> new ServiceErrorException(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_NOT_FOUND));
+
+        subscription.updateAfterPayment(paymentId);
+        subscriptionRepository.save(subscription);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Subscription> getActiveSubscription(Long userId) {
+        return subscriptionRepository.findByUserIdAndSubscriptionStatus(userId, SubscriptionStatus.ACTIVE);
+    }
+}
