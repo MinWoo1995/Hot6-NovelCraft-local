@@ -20,8 +20,8 @@ public class JwtUtil {
     public static final String BEARER_PREFIX = "Bearer ";
 
     // 테스트용 배포 전에 바꾸기
-    private static final long ACCESS_TOKEN_TIME = 5 * 60 * 1000L; // 토큰 발급 유효 5분
-    private static final long REFRESH_TOKEN_TIME = 10 * 60 * 1000L; // RT 발급 유효 10분
+    private static final long ACCESS_TOKEN_TIME = 6 * 60 * 60 * 1000L; // 6시간
+    private static final long REFRESH_TOKEN_TIME = 24 * 60 * 60 * 1000L; // 24시간
     private static final long TEMP_TOKEN_TIME = 5 * 60 * 1000L; // 임시 토큰 5분
     private static final long SOCIAL_TOKEN_TIME = 10 * 60 * 1000L; // 소셜 가입용 10분
     private static final long RECOVERY_TIME = 10 * 60 * 1000L; // 계정 복구 맟 파기 임시 토큰 10분

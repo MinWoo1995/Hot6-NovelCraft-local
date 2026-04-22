@@ -90,8 +90,7 @@ class MentorControllerTest {
                     1L, MentorStatus.PENDING, LocalDateTime.now()
             );
 
-            given(mentorService.register(eq(USER_ID), any(), any())).willReturn(mockResponse);
-
+            given(mentorService.register(eq(USER_ID), any())).willReturn(mockResponse);
             ResponseEntity<BaseResponse<MentorRegisterResponse>> response =
                     mentorController.register(userDetails, request);
 
@@ -100,7 +99,7 @@ class MentorControllerTest {
             assertThat(response.getBody().success()).isTrue();
             assertThat(response.getBody().status()).isEqualTo("201");
             assertThat(response.getBody().data().status()).isEqualTo(MentorStatus.PENDING);
-            verify(mentorService, times(1)).register(eq(USER_ID), any(), any());
+            verify(mentorService, times(1)).register(eq(USER_ID), any());
         }
 
         @Test
@@ -118,7 +117,7 @@ class MentorControllerTest {
                     1L, MentorStatus.APPROVED, LocalDateTime.now()
             );
 
-            given(mentorService.register(eq(USER_ID), any(), any())).willReturn(mockResponse);
+            given(mentorService.register(eq(USER_ID), any())).willReturn(mockResponse);
 
             ResponseEntity<BaseResponse<MentorRegisterResponse>> response =
                     mentorController.register(userDetails, request);

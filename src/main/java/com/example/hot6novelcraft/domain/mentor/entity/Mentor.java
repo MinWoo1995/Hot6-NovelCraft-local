@@ -48,8 +48,6 @@ public class Mentor extends BaseEntity {
     @Column(length = 500)
     private String preferredMenteeDesc;
 
-    private String certificationFileUrl;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MentorStatus status;
@@ -84,7 +82,7 @@ public class Mentor extends BaseEntity {
     private Mentor(Long userId, CareerLevel careerLevel, String mainGenres, String specialFields,
                    String mentoringStyle, String bio, String awardsCareer,
                    Integer maxMentees, Boolean allowInstant, String preferredMenteeDesc,
-                   String certificationFileUrl, MentorStatus status) {
+                   MentorStatus status) {
         this.userId = userId;
         this.careerLevel = careerLevel;
         this.mainGenres = mainGenres;
@@ -95,18 +93,15 @@ public class Mentor extends BaseEntity {
         this.maxMentees = maxMentees;
         this.allowInstant = allowInstant;
         this.preferredMenteeDesc = preferredMenteeDesc;
-        this.certificationFileUrl = certificationFileUrl;
         this.status = status;
     }
 
     public static Mentor create(Long userId, CareerLevel careerLevel, String mainGenres,
                                 String specialFields, String mentoringStyle, String bio,
                                 String awardsCareer, Integer maxMentees, Boolean allowInstant,
-                                String preferredMenteeDesc, String certificationFileUrl,
-                                MentorStatus initialStatus) {
+                                String preferredMenteeDesc, MentorStatus initialStatus) {
         return new Mentor(userId, careerLevel, mainGenres, specialFields, mentoringStyle,
-                bio, awardsCareer, maxMentees, allowInstant, preferredMenteeDesc,
-                certificationFileUrl, initialStatus);
+                bio, awardsCareer, maxMentees, allowInstant, preferredMenteeDesc, initialStatus);
     }
 
     public void update(String introduction, String mainGenres, String specialFields,

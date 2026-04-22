@@ -2,11 +2,17 @@ package com.example.hot6novelcraft.domain.mentoring.repository;
 
 import com.example.hot6novelcraft.domain.mentor.entity.QMentor;
 import com.example.hot6novelcraft.domain.mentor.entity.enums.MentorStatus;
+import com.example.hot6novelcraft.domain.mentoring.dto.response.MentoringReceivedResponse;
 import com.example.hot6novelcraft.domain.mentoring.dto.response.MentorWithNickname;
+import com.example.hot6novelcraft.domain.mentoring.dto.response.MentorshipHistoryResponse;
+import com.example.hot6novelcraft.domain.mentoring.entity.QMentorship;
+import com.example.hot6novelcraft.domain.mentoring.entity.enums.MentorshipStatus;
+import com.example.hot6novelcraft.domain.novel.entity.QNovel;
 import com.example.hot6novelcraft.domain.user.entity.QUser;
 import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,21 +32,15 @@ public class CustomMentorshipRepositoryImpl implements CustomMentorshipRepositor
         QUser user = QUser.user;
 
         BooleanBuilder where = new BooleanBuilder();
-
-        // APPROVED 상태만 조회
         where.and(mentor.status.eq(MentorStatus.APPROVED));
 
-        // 장르 필터
         if (genre != null && !genre.isBlank()) {
             where.and(mentor.mainGenres.contains("\"" + genre + "\""));
         }
-
-        // 등급 필터
         if (careerLevel != null) {
             where.and(mentor.careerLevel.eq(careerLevel));
         }
 
-        // Mentor + User JOIN으로 한번에 조회
         List<MentorWithNickname> content = queryFactory
                 .select(Projections.constructor(
                         MentorWithNickname.class,
@@ -61,11 +61,86 @@ public class CustomMentorshipRepositoryImpl implements CustomMentorshipRepositor
                 .limit(pageable.getPageSize())
                 .fetch();
 
-        // 총 개수
         Long total = queryFactory
                 .select(mentor.count())
                 .from(mentor)
                 .where(where)
+                .fetchOne();
+
+        return new PageImpl<>(content, pageable, total != null ? total : 0);
+    }
+
+    @Override
+    public List<MentorshipHistoryResponse> findMyHistoryWithMentorNickname(Long menteeId, MentorshipStatus status) {
+        QMentorship mentorship = QMentorship.mentorship;
+        QMentor mentor = QMentor.mentor;
+        QUser user = QUser.user;
+
+        BooleanBuilder where = new BooleanBuilder();
+        where.and(mentorship.menteeId.eq(menteeId));
+        if (status != null) {
+            where.and(mentorship.status.eq(status));
+        }
+
+        return queryFactory
+                .select(Projections.constructor(
+                        MentorshipHistoryResponse.class,
+                        mentorship.id,
+                        // null 방어 - 탈퇴한 멘토는 기본값으로 대체
+                        Expressions.cases()
+                                .when(user.nickname.isNull())
+                                .then("알 수 없는 멘토")
+                                .otherwise(user.nickname),
+                        mentorship.status,
+                        mentorship.createdAt
+                ))
+                .from(mentorship)
+                .join(mentor).on(mentor.id.eq(mentorship.mentorId))
+                .leftJoin(user).on(user.id.eq(mentor.userId)
+                        .and(user.isDeleted.eq(false)))
+                .where(where)
+                .orderBy(mentorship.createdAt.desc())
+                .fetch();
+    }
+
+    @Override
+    public Page<MentoringReceivedResponse> findReceivedMentoringsWithDetails(Long mentorId, Pageable pageable) {
+        QMentorship mentorship = QMentorship.mentorship;
+        QUser menteeUser = new QUser("menteeUser");
+        QNovel novel = QNovel.novel;
+
+        List<MentoringReceivedResponse> content = queryFactory
+                .select(Projections.constructor(
+                        MentoringReceivedResponse.class,
+                        mentorship.id,
+                        mentorship.menteeId,
+                        // null 방어 - 삭제된 유저/소설은 기본값으로 대체
+                        Expressions.cases()
+                                .when(menteeUser.nickname.isNull())
+                                .then("알 수 없는 사용자")
+                                .otherwise(menteeUser.nickname),
+                        Expressions.cases()
+                                .when(novel.title.isNull())
+                                .then("알 수 없는 소설")
+                                .otherwise(novel.title),
+                        mentorship.createdAt,
+                        mentorship.status
+                ))
+                .from(mentorship)
+                .leftJoin(menteeUser).on(menteeUser.id.eq(mentorship.menteeId)
+                        .and(menteeUser.isDeleted.eq(false)))
+                .leftJoin(novel).on(novel.id.eq(mentorship.currentNovelId)
+                        .and(novel.isDeleted.eq(false)))
+                .where(mentorship.mentorId.eq(mentorId))
+                .orderBy(mentorship.createdAt.desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        Long total = queryFactory
+                .select(mentorship.count())
+                .from(mentorship)
+                .where(mentorship.mentorId.eq(mentorId))
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0);

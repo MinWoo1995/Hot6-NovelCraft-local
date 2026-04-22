@@ -146,6 +146,10 @@ public class MentorshipService {
         );
     }
 
+    /**
+     * V1 - 내 멘토링 이력 조회
+     * N+1 존재 - 멘토링 수만큼 mentorRepository + userRepository 반복 쿼리 발생
+     */
     // 내 멘토링 조회(멘티 시점)
     @Transactional(readOnly = true)
     public List<MentorshipHistoryResponse> getMyHistory(Long menteeId, MentorshipStatus status) {
@@ -182,6 +186,19 @@ public class MentorshipService {
                     );
                 })
                 .toList();
+    }
+
+    // V2: N+1 개선 - QueryDSL JOIN으로 멘토 닉네임 한번에 조회
+    @Transactional(readOnly = true)
+    public List<MentorshipHistoryResponse> getMyHistoryV2(Long menteeId, MentorshipStatus status) {
+        User mentee = userRepository.findById(menteeId)
+                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+
+        if (mentee.getRole() != UserRole.AUTHOR) {
+            throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_AUTHOR);
+        }
+
+        return mentorshipRepository.findMyHistoryWithMentorNickname(menteeId, status);
     }
 
     // JSON 문자열을 List<String>으로 변환
