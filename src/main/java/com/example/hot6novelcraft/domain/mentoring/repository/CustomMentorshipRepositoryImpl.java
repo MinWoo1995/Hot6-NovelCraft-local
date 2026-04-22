@@ -86,13 +86,18 @@ public class CustomMentorshipRepositoryImpl implements CustomMentorshipRepositor
                 .select(Projections.constructor(
                         MentorshipHistoryResponse.class,
                         mentorship.id,
-                        user.nickname,
+                        // null 방어 - 탈퇴한 멘토는 기본값으로 대체
+                        Expressions.cases()
+                                .when(user.nickname.isNull())
+                                .then("알 수 없는 멘토")
+                                .otherwise(user.nickname),
                         mentorship.status,
                         mentorship.createdAt
                 ))
                 .from(mentorship)
                 .join(mentor).on(mentor.id.eq(mentorship.mentorId))
-                .join(user).on(user.id.eq(mentor.userId))
+                .leftJoin(user).on(user.id.eq(mentor.userId)
+                        .and(user.isDeleted.eq(false)))
                 .where(where)
                 .orderBy(mentorship.createdAt.desc())
                 .fetch();
