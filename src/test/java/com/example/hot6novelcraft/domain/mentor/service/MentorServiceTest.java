@@ -102,7 +102,6 @@ class MentorServiceTest {
                 3,
                 true,
                 "연재 의지가 강한 분을 환영합니다",
-                null,
                 MentorStatus.PENDING
         );
     }
@@ -125,7 +124,7 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            mentorService.register(USER_ID, registerRequest, null);
+            mentorService.register(USER_ID, registerRequest);
 
             Mentor savedMentor = captor.getValue();
             assertThat(savedMentor.getStatus()).isEqualTo(MentorStatus.PENDING);
@@ -144,7 +143,7 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            mentorService.register(USER_ID, registerRequest, null);
+            mentorService.register(USER_ID, registerRequest);
 
             assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.APPROVED);
         }
@@ -170,7 +169,7 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            mentorService.register(USER_ID, elementaryRequest, null);
+            mentorService.register(USER_ID, elementaryRequest);
 
             assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.APPROVED);
         }
@@ -196,7 +195,7 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            mentorService.register(USER_ID, intermediateRequest, null);
+            mentorService.register(USER_ID, intermediateRequest);
 
             assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.APPROVED);
         }
@@ -219,7 +218,7 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            mentorService.register(USER_ID, proficientRequest, null);
+            mentorService.register(USER_ID, proficientRequest);
 
             assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.PENDING);
             verify(novelRepository, never()).findNovelIdsByAuthorId(any());
@@ -236,7 +235,7 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            mentorService.register(USER_ID, registerRequest, null);
+            mentorService.register(USER_ID, registerRequest);
 
             assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.PENDING);
             verify(episodeRepository, never()).countByNovelIdInAndStatus(any(), any());
@@ -247,7 +246,7 @@ class MentorServiceTest {
         void register_pending_exists_throws() {
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.PENDING)).willReturn(true);
 
-            assertThatThrownBy(() -> mentorService.register(USER_ID, registerRequest, null))
+            assertThatThrownBy(() -> mentorService.register(USER_ID, registerRequest))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_PENDING_EXISTS.getMessage());
 
@@ -260,7 +259,7 @@ class MentorServiceTest {
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.PENDING)).willReturn(false);
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.APPROVED)).willReturn(true);
 
-            assertThatThrownBy(() -> mentorService.register(USER_ID, registerRequest, null))
+            assertThatThrownBy(() -> mentorService.register(USER_ID, registerRequest))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_ALREADY_APPROVED.getMessage());
 
@@ -360,7 +359,7 @@ class MentorServiceTest {
         given(objectMapper.writeValueAsString(any())).willReturn("[\"판타지\"]");
         given(mentorRepository.save(any())).willThrow(DataIntegrityViolationException.class);
 
-        assertThatThrownBy(() -> mentorService.register(USER_ID, registerRequest, null))
+        assertThatThrownBy(() -> mentorService.register(USER_ID, registerRequest))
                 .isInstanceOf(ServiceErrorException.class)
                 .hasMessage(MentorExceptionEnum.MENTOR_ALREADY_APPROVED.getMessage());
     }
@@ -386,12 +385,18 @@ class MentorServiceTest {
         @Test
         @DisplayName("APPROVED 상태 정상 조회")
         void getMyStatus_approved_success() {
-            Mentor approvedMentor = Mentor.create(
-                    USER_ID, CareerLevel.INTRODUCTION,
-                    "[\"판타지\"]", "[\"문장력\"]", "[\"꼼꼼한 피드백형\"]",
-                    "판타지 장르를 10년째 쓰고 있습니다", "2022 웹소설 신인상 수상",
-                    3, true, "연재 의지가 강한 분을 환영합니다",
-                    null, MentorStatus.APPROVED
+            Mentor approvedMentor = mentor = Mentor.create(
+                    USER_ID,
+                    CareerLevel.INTRODUCTION,
+                    "[\"판타지\"]",
+                    "[\"문장력\"]",
+                    "[\"꼼꼼한 피드백형\"]",
+                    "판타지 장르를 10년째 쓰고 있습니다",
+                    "2022 웹소설 신인상 수상",
+                    3,
+                    true,
+                    "연재 의지가 강한 분을 환영합니다",
+                    MentorStatus.APPROVED
             );
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(approvedMentor));
 
@@ -404,12 +409,18 @@ class MentorServiceTest {
         @Test
         @DisplayName("REJECTED 상태 조회 시 rejectReason 반환")
         void getMyStatus_rejected_with_reason() {
-            Mentor rejectedMentor = Mentor.create(
-                    USER_ID, CareerLevel.INTRODUCTION,
-                    "[\"판타지\"]", "[\"문장력\"]", "[\"꼼꼼한 피드백형\"]",
-                    "판타지 장르를 10년째 쓰고 있습니다", "2022 웹소설 신인상 수상",
-                    3, true, "연재 의지가 강한 분을 환영합니다",
-                    null, MentorStatus.PENDING
+            Mentor rejectedMentor = mentor = Mentor.create(
+                    USER_ID,
+                    CareerLevel.INTRODUCTION,
+                    "[\"판타지\"]",
+                    "[\"문장력\"]",
+                    "[\"꼼꼼한 피드백형\"]",
+                    "판타지 장르를 10년째 쓰고 있습니다",
+                    "2022 웹소설 신인상 수상",
+                    3,
+                    true,
+                    "연재 의지가 강한 분을 환영합니다",
+                    MentorStatus.PENDING
             );
             rejectedMentor.reject("전문성 기준 미달입니다");
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(rejectedMentor));

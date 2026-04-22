@@ -157,25 +157,13 @@ public class MentoringService {
 
     /**
      * V2 - 내 멘토링 접수 목록 조회
-     * soft-delete 적용 (findByIdAndIsDeletedFalse 사용) — 삭제된 소설 제목 노출 방지
+     * soft-delete 적용 + N+1 개선 (QueryDSL JOIN)
      */
     public Page<MentoringReceivedResponse> getReceivedMentoringsV2(Long userId, Pageable pageable) {
         Mentor mentor = mentorRepository.findByUserId(userId)
                 .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
 
-        return mentorshipRepository.findAllByMentorIdOrderByCreatedAtDesc(mentor.getId(), pageable)
-                .map(mentorship -> {
-                    String menteeName = userRepository.findByIdAndIsDeletedFalse(mentorship.getMenteeId())
-                            .map(User::getNickname)
-                            .orElse("알 수 없는 사용자");
-
-                    // V2: soft-delete 적용 — 삭제된 소설은 "알 수 없는 소설" 반환
-                    String title = novelRepository.findByIdAndIsDeletedFalse(mentorship.getCurrentNovelId())
-                            .map(Novel::getTitle)
-                            .orElse("알 수 없는 소설");
-
-                    return MentoringReceivedResponse.of(mentorship, menteeName, title);
-                });
+        return mentorshipRepository.findReceivedMentoringsWithDetails(mentor.getId(), pageable);
     }
 
     // =====================================================================

@@ -22,17 +22,13 @@ public class MentorController {
 
     private final MentorService mentorService;
 
-    // 멘토 등록 신청 multipart/form-data 로 전문가 인증 서류 파일 + 신청 정보 함께 수신
+    // 멘토 등록 신청
     @PostMapping
     public ResponseEntity<BaseResponse<MentorRegisterResponse>> register(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
             @Valid @RequestBody MentorRegisterRequest request
-            // TODO: [S3 연동 후 multipart/form-data 로 변경 필요]
-            // @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-            // @RequestPart("data") MentorRegisterRequest request
-            // @RequestPart(value = "certificationFile", required = false) MultipartFile certificationFile
     ) {
-        MentorRegisterResponse response = mentorService.register(userDetails.getUser().getId(), request, null);
+        MentorRegisterResponse response = mentorService.register(userDetails.getUser().getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(BaseResponse.success("201", "멘토 신청이 정상적으로 접수되었습니다", response));
     }
@@ -78,6 +74,14 @@ public class MentorController {
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
         List<MenteeInfoResponse> response = mentorService.getMyMentees(userDetails.getUser().getId());
+        return ResponseEntity.ok(BaseResponse.success("200", "내 멘티 목록 조회가 완료되었습니다", response));
+    }
+    // 내 멘티 목록 조회 v2 - QueryDSL N+1 개선
+    @GetMapping("/v2/me/mentees")
+    public ResponseEntity<BaseResponse<List<MenteeInfoResponse>>> getMyMenteesV2(
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        List<MenteeInfoResponse> response = mentorService.getMyMenteesV2(userDetails.getUser().getId());
         return ResponseEntity.ok(BaseResponse.success("200", "내 멘티 목록 조회가 완료되었습니다", response));
     }
     @GetMapping("/me/statistics/detail")

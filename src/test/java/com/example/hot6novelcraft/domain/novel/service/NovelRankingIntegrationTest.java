@@ -54,6 +54,8 @@ public class NovelRankingIntegrationTest {
                 .password("password123!")
                 .nickname("테스트작가")
                 .role(UserRole.AUTHOR)
+                .birthday(java.time.LocalDate.of(1990, 1, 1))
+                .phoneNo("010-0000-0000")
                 .build();
         dummyAuthor = userRepository.save(authorUser); // DB에 저장!
 

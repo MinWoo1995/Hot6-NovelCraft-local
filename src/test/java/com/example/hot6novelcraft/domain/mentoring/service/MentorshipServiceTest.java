@@ -86,7 +86,7 @@ class MentorshipServiceTest {
         mentor = Mentor.create(
                 MENTOR_USER_ID, CareerLevel.INTRODUCTION,
                 "[\"판타지\"]", "[\"문장력\"]", "[\"꼼꼼한 피드백형\"]",
-                "소개글", "수상경력", 3, true, "멘티 설명", null, MentorStatus.APPROVED
+                "소개글", "수상경력", 3, true, "멘티 설명", MentorStatus.APPROVED
         );
         setField(mentor, "id", MENTOR_ENTITY_ID);
     }
@@ -156,9 +156,10 @@ class MentorshipServiceTest {
         @DisplayName("본인에게 신청 시 예외")
         void applyMentorship_self_apply_throws() {
             // mentor의 userId를 menteeId와 같게 설정
-            Mentor selfMentor = Mentor.create(
+            Mentor selfMentor = mentor = Mentor.create(
                     MENTEE_ID, CareerLevel.INTRODUCTION,
-                    "[]", "[]", "[]", "소개", null, 3, true, "설명", null, MentorStatus.APPROVED
+                    "[\"판타지\"]", "[\"문장력\"]", "[\"꼼꼼한 피드백형\"]",
+                    "소개글", "수상경력", 3, true, "멘티 설명", MentorStatus.APPROVED
             );
             setField(selfMentor, "id", MENTOR_ENTITY_ID);
 
@@ -194,9 +195,10 @@ class MentorshipServiceTest {
         @Test
         @DisplayName("정원 마감이면 예외")
         void applyMentorship_slot_full_throws() {
-            Mentor fullMentor = Mentor.create(
+            Mentor fullMentor = mentor = Mentor.create(
                     MENTOR_USER_ID, CareerLevel.INTRODUCTION,
-                    "[]", "[]", "[]", "소개", null, 0, true, "설명", null, MentorStatus.APPROVED
+                    "[\"판타지\"]", "[\"문장력\"]", "[\"꼼꼼한 피드백형\"]",
+                    "소개글", "수상경력", 0, true, "멘티 설명", MentorStatus.APPROVED
             );
             setField(fullMentor, "id", MENTOR_ENTITY_ID);
 

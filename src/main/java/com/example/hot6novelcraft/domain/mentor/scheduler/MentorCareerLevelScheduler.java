@@ -11,16 +11,15 @@ import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-// TODO: 스케줄러 관련해서 고도화 검토하기 아래내용
-//스케줄러는 근본적으로 서버를 분리해야한다.
-//스케줄러는 인서트와 업데이트만 담당하고
-//조회는 따로분리한다
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -31,6 +30,7 @@ public class MentorCareerLevelScheduler {
     private static final long ELEMENTARY_MIN_LIKES = 50L;
     private static final long INTERMEDIATE_MIN_EPISODES = 100L;
     private static final long INTERMEDIATE_MIN_LIKES = 100L;
+    private static final int CHUNK_SIZE = 100;
 
     private final MentorRepository mentorRepository;
     private final MentorCareerHistoryRepository mentorCareerHistoryRepository;
@@ -40,19 +40,37 @@ public class MentorCareerLevelScheduler {
     /**
      * 매일 자정 멘토 등급 자동 조정
      * PROFICIENT(전문)는 관리자 수동 승급이므로 배치 대상 제외
+     * 청크 단위(100명) 처리로 메모리 부하 개선
      */
     @Scheduled(cron = "0 0 0 * * *")
     @Transactional
     public void adjustCareerLevels() {
         log.info("[MentorCareerLevelScheduler] 멘토 등급 자동 조정 배치 시작");
 
-        List<Mentor> targets = mentorRepository.findAllByStatusAndCareerLevelNot(
-                MentorStatus.APPROVED, CareerLevel.PROFICIENT
-        );
+        int pageNumber = 0;
+        int totalUpgradedCount = 0;
+        Page<Mentor> page;
 
+        do {
+            Pageable pageable = PageRequest.of(pageNumber, CHUNK_SIZE);
+            page = mentorRepository.findAllByStatusAndCareerLevelNot(
+                    MentorStatus.APPROVED, CareerLevel.PROFICIENT, pageable
+            );
+
+            int upgradedCount = processChunk(page.getContent());
+            totalUpgradedCount += upgradedCount;
+            pageNumber++;
+
+        } while (!page.isLast());
+
+        log.info("[MentorCareerLevelScheduler] 배치 완료 - 총 {}명 등급 조정", totalUpgradedCount);
+    }
+
+    private int processChunk(List<Mentor> mentors) {
         int upgradedCount = 0;
-        for (Mentor mentor : targets) {
-            CareerLevel previousLevel = mentor.getCareerLevel(); // 변경 전 등급 먼저 저장
+
+        for (Mentor mentor : mentors) {
+            CareerLevel previousLevel = mentor.getCareerLevel();
             CareerLevel newLevel = resolveNewLevel(mentor);
 
             if (newLevel != null && newLevel != previousLevel) {
@@ -66,11 +84,11 @@ public class MentorCareerLevelScheduler {
                 mentorCareerHistoryRepository.save(history);
                 upgradedCount++;
                 log.info("[MentorCareerLevelScheduler] mentorId={} {} → {}",
-                        mentor.getId(), previousLevel, newLevel); // 저장한 previousLevel 사용
+                        mentor.getId(), previousLevel, newLevel);
             }
         }
 
-        log.info("[MentorCareerLevelScheduler] 배치 완료 - 총 {}명 등급 조정", upgradedCount);
+        return upgradedCount;
     }
 
     private CareerLevel resolveNewLevel(Mentor mentor) {

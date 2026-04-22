@@ -26,7 +26,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -54,8 +53,7 @@ public class MentorService {
      * 멘토 등록 신청
      */
     @Transactional
-    public MentorRegisterResponse register(Long userId, MentorRegisterRequest request,
-                                           MultipartFile certificationFile) {
+    public MentorRegisterResponse register(Long userId, MentorRegisterRequest request) {
         if (mentorRepository.existsByUserIdAndStatus(userId, MentorStatus.PENDING)) {
             throw new ServiceErrorException(MentorExceptionEnum.MENTOR_PENDING_EXISTS);
         }
@@ -63,7 +61,6 @@ public class MentorService {
             throw new ServiceErrorException(MentorExceptionEnum.MENTOR_ALREADY_APPROVED);
         }
 
-        String fileUrl = uploadCertificationFile(certificationFile);
         MentorStatus initialStatus = resolveInitialStatus(userId, request.careerLevel());
 
         Mentor mentor = Mentor.create(
@@ -77,7 +74,6 @@ public class MentorService {
                 request.maxMentees(),
                 request.allowInstant(),
                 request.preferredMenteeDesc(),
-                fileUrl,
                 initialStatus
         );
 
@@ -138,10 +134,7 @@ public class MentorService {
     }
 
     /**
-     * 내 멘토링 통계 조회 - 좌측 상단
-     * - 대기 중 건수
-     * - 이번 달 수락 건수 (acceptedAt 기준, COMPLETED 상태여도 누락 없음)
-     * - 이번 달 거절 건수 (rejectedAt 기준)
+     * 내 멘토링 통계 조회
      */
     @Transactional(readOnly = true)
     public MentorStatisticsResponse getStatistics(Long userId) {
@@ -164,8 +157,7 @@ public class MentorService {
     }
 
     /**
-     * 내 멘티 목록 조회 - ACCEPTED 상태인 멘티만
-     * TODO: 고도화 시 QueryDSL로 멘티명/소설명 JOIN 조회로 교체 (현재 N+1 발생 가능)
+     * 내 멘티 목록 조회
      */
     @Transactional(readOnly = true)
     public List<MenteeInfoResponse> getMyMentees(Long userId) {
@@ -179,7 +171,6 @@ public class MentorService {
                             .map(User::getNickname)
                             .orElse("알 수 없는 사용자");
 
-                    // TODO: 고도화 시 NovelRepository에 findByIdAndIsDeletedFalse 추가 후 교체
                     String novelTitle = novelRepository.findById(mentorship.getCurrentNovelId())
                             .map(Novel::getTitle)
                             .orElse("알 수 없는 소설");
@@ -195,10 +186,18 @@ public class MentorService {
     }
 
     /**
-     * 내 멘토링 통계 상세 조회 - 우측 멘토링 통계
-     * - 총 멘티 수
-     * - 완료 세션 수
-     * - 평균 만족도
+     * 내 멘티 목록 조회 v2 - QueryDSL JOIN으로 N+1 개선
+     */
+    @Transactional(readOnly = true)
+    public List<MenteeInfoResponse> getMyMenteesV2(Long userId) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        return mentorRepository.findMenteesWithDetails(mentor.getId());
+    }
+
+    /**
+     * 내 멘토링 통계 상세 조회
      */
     @Transactional(readOnly = true)
     public MentorStatisticsDetailResponse getStatisticsDetail(Long userId) {
@@ -237,14 +236,6 @@ public class MentorService {
                     ? MentorStatus.APPROVED : MentorStatus.PENDING;
             default -> MentorStatus.PENDING;
         };
-    }
-
-    private String uploadCertificationFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            return null;
-        }
-        // TODO: S3 연동 후 UUID 기반 파일명으로 변경 필요 (path traversal 방어)
-        return file.getOriginalFilename();
     }
 
     private String toJson(List<String> list) {

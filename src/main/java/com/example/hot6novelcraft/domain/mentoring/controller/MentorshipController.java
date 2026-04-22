@@ -88,4 +88,15 @@ public class MentorshipController {
         List<MentorshipHistoryResponse> response = mentorshipService.getMyHistory(menteeId, status);
         return ResponseEntity.ok(BaseResponse.success("200", "멘토링 이력 조회 성공", response));
     }
+
+    // V2: N+1 개선
+    @GetMapping("/v2/me/history")
+    public ResponseEntity<BaseResponse<List<MentorshipHistoryResponse>>> getMyHistoryV2(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @RequestParam(required = false) MentorshipStatus status
+    ) {
+        Long menteeId = userDetails.getUser().getId();
+        List<MentorshipHistoryResponse> response = mentorshipService.getMyHistoryV2(menteeId, status);
+        return ResponseEntity.ok(BaseResponse.success("200", "멘토링 이력 조회 성공", response));
+    }
 }
