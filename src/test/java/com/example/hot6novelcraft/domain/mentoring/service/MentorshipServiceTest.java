@@ -9,6 +9,7 @@ import com.example.hot6novelcraft.domain.mentor.entity.Mentor;
 import com.example.hot6novelcraft.domain.mentor.entity.enums.MentorStatus;
 import com.example.hot6novelcraft.domain.mentor.repository.MentorRepository;
 import com.example.hot6novelcraft.domain.mentoring.dto.request.MentorshipCreateRequest;
+import com.example.hot6novelcraft.domain.mentoring.dto.response.MentorshipDetailResponse;
 import com.example.hot6novelcraft.domain.mentoring.entity.Mentorship;
 import com.example.hot6novelcraft.domain.mentoring.repository.MentorshipRepository;
 import com.example.hot6novelcraft.domain.user.entity.User;
@@ -369,6 +370,38 @@ class MentorshipServiceTest {
 
             assertThat(result.getContent()).isEmpty();
             assertThat(result.getTotalElements()).isZero();
+        }
+    }
+
+    // ==================== 멘토 상세 조회 ====================
+    @Nested
+    @DisplayName("멘토 상세 조회")
+    class GetMentorDetailTest {
+
+        @Test
+        @DisplayName("정상 조회 성공")
+        void getMentorDetail_success() {
+            given(mentorRepository.findById(MENTOR_ENTITY_ID)).willReturn(Optional.of(mentor));
+            given(userRepository.findById(MENTOR_USER_ID)).willReturn(Optional.of(
+                    User.builder().email("mentor@test.com").password("pw")
+                            .nickname("멘토닉네임").role(UserRole.AUTHOR).build()
+            ));
+
+            MentorshipDetailResponse result = mentorshipService.getMentorDetail(MENTOR_ENTITY_ID);
+
+            assertThat(result.mentorId()).isEqualTo(MENTOR_ENTITY_ID);
+            assertThat(result.nickname()).isEqualTo("멘토닉네임");
+            assertThat(result.bio()).isEqualTo("소개글");
+        }
+
+        @Test
+        @DisplayName("멘토 못 찾으면 예외")
+        void getMentorDetail_not_found() {
+            given(mentorRepository.findById(999L)).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> mentorshipService.getMentorDetail(999L))
+                    .isInstanceOf(ServiceErrorException.class)
+                    .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
     }
 }
