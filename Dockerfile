@@ -1,4 +1,4 @@
-1단계: 빌드
+#1단계: 빌드
 FROM gradle:8.5-jdk17 AS build
 WORKDIR /app
 COPY . .
