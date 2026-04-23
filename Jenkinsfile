@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'minwoo/novelcraft'
+        DOCKER_IMAGE = 'jmw1995/novelcraft'
         DOCKER_TAG = "${BUILD_NUMBER}"
         APP_EC2_IP = '43.200.129.27'           // ← 본인 App EC2 퍼블릭 IP
         FRONTEND_URL = 'https://43.200.129.27:8080'    // ← 본인 도메인
