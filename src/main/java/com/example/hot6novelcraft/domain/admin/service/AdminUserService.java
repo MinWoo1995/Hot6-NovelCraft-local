@@ -23,7 +23,6 @@ public class AdminUserService {
 
     /**
      * 일반 관리자 승인 대기 목록 조회
-     * 관리자 권한 변경
      * 관리자 승인/거절 처리
      * */
 

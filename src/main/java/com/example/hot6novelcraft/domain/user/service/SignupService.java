@@ -88,20 +88,14 @@ public class SignupService {
     @Transactional
     public String commonSignup(CommonSignupRequest request) {
 
+        // SMS 인증
+        consumePhoneVerification(request.tempToken(), request.phoneNo());
+
         // 이메일 및 닉네임 중복 확인
         checkEmail(request.email());
         checkNickname(request.nickname());
 
         String encoderPassword = passwordEncoder.encode(request.password());
-
-        // SMS 인가/인증 - 회원가입 상태 조회와 삭제를 동시에 진행
-        String smsToken = "SMS:TOKEN:" + request.tempToken();
-        String verifiedPhone = (String) redisUtil.getAndDelete(smsToken);
-
-        // 폰 인증 UUID 임시 토큰 검증, 토큰 안의 폰 번호와 입력한 폰 번호가 다르면 에러
-        if (verifiedPhone == null || !verifiedPhone.equals(request.phoneNo())) {
-            throw new ServiceErrorException(UserExceptionEnum.ERR_PHONE_NOT_VERIFIED);
-        }
 
         // Redis 임시 토큰 Temp에 담을 정보 (유효시간 10분)
         TempSignupRequest tempRequest = new TempSignupRequest(
@@ -172,15 +166,8 @@ public class SignupService {
     @Transactional
     public SocialSignupResponse socialCommonSignup(SocialSignupRequest request, String email, String providerId, ProviderSns providerSns) {
 
+        consumePhoneVerification(request.tempToken(), request.phoneNo());
         checkNickname(request.nickname());
-
-        String smsToken = "SMS:TOKEN:" + request.tempToken();
-        String verifiedPhone = (String) redisUtil.getAndDelete(smsToken);
-
-        // 폰 인증 UUID 임시 토큰 검증, 토큰 안의 폰 번호와 입력한 폰 번호가 다르면 에러
-        if (verifiedPhone == null || !verifiedPhone.equals(request.phoneNo())) {
-            throw new ServiceErrorException(UserExceptionEnum.ERR_PHONE_NOT_VERIFIED);
-        }
 
         // 소셜 유저 검증 - 탈퇴 유예 기간 유저인지 체크 및 비밀번호는 SOCIAL LOGIN으로 고정
         Optional<User> optionalUser = userRepository.findByEmail(email);
@@ -375,5 +362,14 @@ public class SignupService {
         log.info("관리자 가입 완료 - email: {}", email);
 
         return AdminSignupResponse.of(admin);
+    }
+
+    // SMS 공통 메소드
+    private void consumePhoneVerification(String tempToken,String phoneNo) {
+        String smsToken = "SMS:TOKEN:" + tempToken;
+        String verifiedPhone = (String) redisUtil.getAndDelete(smsToken);
+        if(verifiedPhone == null || !verifiedPhone.equals(phoneNo)) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_PHONE_NOT_VERIFIED);
+        }
     }
 }
