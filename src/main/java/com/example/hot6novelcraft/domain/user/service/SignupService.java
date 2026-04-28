@@ -368,7 +368,7 @@ public class SignupService {
                 request.email(),
                 encoderPassword,
                 request.phoneNo(),
-                UserRole.ADMIN
+                UserRole.PENDING_ADMIN
         );
         userRepository.save(admin);
 

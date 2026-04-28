@@ -113,10 +113,9 @@ public class SignupController {
     // ======== 관리자 로그인 ========
     @PostMapping("/signup/admin")
     public ResponseEntity<BaseResponse<AdminSignupResponse>> adminSignup(
-            @Valid @RequestBody AdminSignupRequest request,
-            @AuthenticationPrincipal UserDetailsImpl userDetails
+            @Valid @RequestBody AdminSignupRequest request
     ){
-        AdminSignupResponse response = signupService.adminSignup(request, userDetails.getUsername());
+        AdminSignupResponse response = signupService.adminSignup(request, request.email());
         return ResponseEntity.status(HttpStatus.CREATED).body(BaseResponse.success("201", "관리자 권한으로 회원가입이 완료되었습니다.", response));
     }
 }

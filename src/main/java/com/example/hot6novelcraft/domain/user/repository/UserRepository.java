@@ -1,6 +1,7 @@
 package com.example.hot6novelcraft.domain.user.repository;
 
 import com.example.hot6novelcraft.domain.user.entity.User;
+import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
@@ -16,6 +17,8 @@ public interface UserRepository extends JpaRepository <User, Long> {
     Boolean existsByNickname(String nickname);
 
     Optional<User> findByIdAndIsDeletedFalse(Long id);
+
+    List<User> findAllByRole(UserRole role);
 
      // 닉네임 중복 확인 (본인 제외)
     boolean existsByNicknameAndIdNot(String nickname, Long id);
