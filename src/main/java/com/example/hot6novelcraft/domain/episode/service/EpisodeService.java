@@ -4,7 +4,7 @@ import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.EpisodeExceptionEnum;
 import com.example.hot6novelcraft.common.exception.domain.NovelExceptionEnum;
-import com.example.hot6novelcraft.domain.episode.dto.cache.EpisodeBulkCache;
+import com.example.hot6novelcraft.domain.episode.dto.cache.EpisodeContentCache;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeCreateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeUpdateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.response.*;
@@ -24,7 +24,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -95,8 +94,8 @@ public class EpisodeService {
         // 회차 수정
         episode.update(request.title(), request.content());
 
-        // 벌크 캐시 무효화
-        episodeCacheService.evictBulkCache(episode.getNovelId());
+        // 캐시 무효화
+        episodeCacheService.evictContentCache(episode.getId());
 
         return EpisodeUpdateResponse.from(episode.getId());
     }
@@ -123,8 +122,8 @@ public class EpisodeService {
         // 회차 삭제 (소프트 딜리트)
         episode.delete();
 
-        // 벌크 캐시 무효화
-        episodeCacheService.evictBulkCache(episode.getNovelId());
+        // 캐시 무효화
+        episodeCacheService.evictContentCache(episode.getId());
 
         return EpisodeDeleteResponse.from(episode.getId());
     }
@@ -166,8 +165,8 @@ public class EpisodeService {
             novel.changeStatus(NovelStatus.ONGOING);
         }
 
-        // 벌크 캐시 무효화
-        episodeCacheService.evictBulkCache(episode.getNovelId());
+        // 캐시 무효화
+        episodeCacheService.evictContentCache(episode.getId());
 
         return EpisodePublishResponse.from(episode.getId());
     }
@@ -201,7 +200,7 @@ public class EpisodeService {
         }
 
         // 유료 회차 접근 제어 (PointHistory 이력 체크) - K6테스트할때만 주석처리
-//        validateEpisodeAccess(episode, userId);
+        validateEpisodeAccess(episode.getId(), episode.isFree(), userId);
 
         // 소설 조회수 +1 (어뷰징 방지)
         increaseNovelViewCount(episode.getNovelId(), userId);
@@ -209,42 +208,54 @@ public class EpisodeService {
         return EpisodeDetailResponse.from(episode);
     }
 
-    // 회차 본문 조회 V2 (Hot Key + 벌크 캐싱)
+    // 회차 본문 조회 V2 (Hot Key + 캐싱)
     @Transactional
     public EpisodeDetailResponse getEpisodeContentV2(Long episodeId, UserDetailsImpl userDetails) {
 
         Long userId = userDetails.getUser().getId();
 
-        // 회차 메타 정보만 조회 (content 제외 - 가벼운 쿼리)
-        EpisodeMetaDto meta = episodeRepository.findMetaById(episodeId);
+        // 단건 캐시 확인 (인기작은 이미 캐싱돼 있음)
+        EpisodeContentCache cached = episodeCacheService.getContentCache(episodeId);
+        if (cached != null) {
+            increaseNovelViewCount(cached.novelId(), userId);
+            episodeCacheService.increaseHotKeyCount(cached.novelId());
+            return toDetailResponse(cached);
+        }
 
-        // 회차 존재 여부 + 삭제 여부 체크
-        if (meta == null || meta.isDeleted()) {
+        // 캐시 미스 -> DB 조회
+        EpisodeContentCache content = episodeRepository.findContentCacheById(episodeId);
+        if (content == null) {
             throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_FOUND);
         }
 
-        // 발행 여부 체크
-        if (meta.status() != EpisodeStatus.PUBLISHED) {
-            throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_PUBLISHED);
+        // 유료 회차 접근 제어 - K6테스트할때만 주석처리
+        validateEpisodeAccess(content.episodeId(), content.isFree(), userId);
+
+        // 핫키 카운터 증가
+        long recentViews = episodeCacheService.increaseHotKeyCount(content.novelId());
+
+        // 인기작이면 캐싱 (비인기작은 메모리 절약)
+        if (episodeCacheService.isHotNovel(recentViews)) {
+            episodeCacheService.saveContentCache(episodeId, content);
         }
 
-        // 유료 회차 접근 제어 (메타 기반) - K6테스트할때만 주석처리
-//        validateEpisodeAccessByMeta(meta, userId);
+        // 조회수 처리
+        increaseNovelViewCount(content.novelId(), userId);
 
-        // 소설 조회수 +1 (어뷰징 방지)
-        increaseNovelViewCount(meta.novelId(), userId);
+        return toDetailResponse(content);
+    }
 
-        // Hot Key 카운터 증가
-        long recentViews = episodeCacheService.increaseHotKeyCount(meta.novelId());
-
-        // 비인기작 → 이때만 Episode 전체 조회 (content 포함)
-        if (!episodeCacheService.isHotNovel(recentViews)) {
-            Episode episode = findEpisodeById(episodeId);
-            return EpisodeDetailResponse.from(episode);
-        }
-
-        // 인기작 → 벌크 캐시 사용 (content는 캐시에서!)
-        return getEpisodeFromBulkCacheByMeta(meta);
+    // EpisodeContentCache -> EpisodeDetailResponse 변환
+    private EpisodeDetailResponse toDetailResponse(EpisodeContentCache cache) {
+        return new EpisodeDetailResponse(
+                cache.episodeId(),
+                cache.episodeNumber(),
+                cache.title(),
+                cache.content(),
+                cache.likeCount(),
+                cache.isFree(),
+                cache.pointPrice()
+        );
     }
 
     // 작가용 회차 목록 조회 (에디터용)
@@ -313,109 +324,18 @@ public class EpisodeService {
         episodeCacheService.increaseRankingScore(novelId);
     }
 
-    // 유료 회차 접근 제어 (PointHistory 이력 체크)
-    private void validateEpisodeAccess(Episode episode, Long userId) {
+    // 유료 회차 접근 제어 (공통)
+    private void validateEpisodeAccess(Long episodeId, boolean isFree, Long userId) {
 
-        if (episode.isFree()) {
-            return;
-        }
-
-        // 구매이력조회
-        boolean hasPurchased = pointHistoryRepository
-                .existsByUserIdAndEpisodeIdAndType(userId, episode.getId(), PointHistoryType.NOVEL);
-
-        if (!hasPurchased) {
-            throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_POINT_REQUIRED);
-        }
-    }
-
-    // 벌크 캐시에서 회차 조회 (인기작만)
-    private EpisodeDetailResponse getEpisodeFromBulkCache(Episode episode) {
-
-        Long novelId = episode.getNovelId();
-        int episodeNumber = episode.getEpisodeNumber();
-        int bulkIndex = episodeCacheService.calculateBulkIndex(episodeNumber);
-
-        // 캐시 조회
-        List<EpisodeBulkCache> bulk = episodeCacheService.getBulkCache(novelId, bulkIndex);
-
-        // MISS → DB에서 벌크 조회 후 캐싱
-        if (bulk == null) {
-            int startNumber = episodeCacheService.getBulkStartNumber(bulkIndex);
-            int endNumber = episodeCacheService.getBulkEndNumber(bulkIndex);
-
-            List<Episode> bulkEpisodes = episodeRepository.findBulkEpisodes(novelId, startNumber, endNumber);
-            episodeCacheService.saveBulkCache(novelId, bulkIndex, bulkEpisodes);
-
-            bulk = bulkEpisodes.stream()
-                    .map(EpisodeBulkCache::from)
-                    .toList();
-        }
-
-        // 해당 회차 찾기
-        return bulk.stream()
-                .filter(cache -> cache.episodeNumber() == episodeNumber)
-                .findFirst()
-                .map(this::toDetailResponse)
-                .orElseThrow(() -> new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_FOUND));
-    }
-
-    // EpisodeBulkCache -> EpisodeDetailResponse 변환
-    private EpisodeDetailResponse toDetailResponse(EpisodeBulkCache cache) {
-        return new EpisodeDetailResponse(
-                cache.episodeId(),
-                cache.episodeNumber(),
-                cache.title(),
-                cache.content(),
-                cache.likeCount(),
-                cache.isFree(),
-                cache.pointPrice()
-        );
-    }
-
-
-    // 유료 회차 접근 제어 (메타 기반 - V2 전용)
-    private void validateEpisodeAccessByMeta(EpisodeMetaDto meta, Long userId) {
-
-        if (meta.isFree()) {
+        if (isFree) {
             return;
         }
 
         boolean hasPurchased = pointHistoryRepository
-                .existsByUserIdAndEpisodeIdAndType(userId, meta.id(), PointHistoryType.NOVEL);
+                .existsByUserIdAndEpisodeIdAndType(userId, episodeId, PointHistoryType.NOVEL);
 
         if (!hasPurchased) {
             throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_POINT_REQUIRED);
         }
-    }
-
-    // 벌크 캐시에서 회차 조회 (메타 기반 - V2 전용)
-    private EpisodeDetailResponse getEpisodeFromBulkCacheByMeta(EpisodeMetaDto meta) {
-
-        Long novelId = meta.novelId();
-        int episodeNumber = meta.episodeNumber();
-        int bulkIndex = episodeCacheService.calculateBulkIndex(episodeNumber);
-
-        // 캐시 조회
-        List<EpisodeBulkCache> bulk = episodeCacheService.getBulkCache(novelId, bulkIndex);
-
-        // MISS → DB에서 벌크 조회 후 캐싱
-        if (bulk == null) {
-            int startNumber = episodeCacheService.getBulkStartNumber(bulkIndex);
-            int endNumber = episodeCacheService.getBulkEndNumber(bulkIndex);
-
-            List<Episode> bulkEpisodes = episodeRepository.findBulkEpisodes(novelId, startNumber, endNumber);
-            episodeCacheService.saveBulkCache(novelId, bulkIndex, bulkEpisodes);
-
-            bulk = bulkEpisodes.stream()
-                    .map(EpisodeBulkCache::from)
-                    .toList();
-        }
-
-        return bulk.stream()
-                .filter(cache -> cache.episodeNumber() == episodeNumber)
-                .findFirst()
-                .map(this::toDetailResponse)
-                .orElseThrow(() -> new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_FOUND));
     }
 }

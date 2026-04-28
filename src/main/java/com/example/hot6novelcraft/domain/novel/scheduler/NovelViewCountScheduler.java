@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 
@@ -18,7 +19,8 @@ public class NovelViewCountScheduler {
     private final NovelRepository novelRepository;
 
     // 5분마다 Redis 조회수 -> DB 반영
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 300000)
+    @Transactional
     public void syncViewCount() {
         Set<String> keys = episodeCacheService.getAllViewCountKeys();
 
