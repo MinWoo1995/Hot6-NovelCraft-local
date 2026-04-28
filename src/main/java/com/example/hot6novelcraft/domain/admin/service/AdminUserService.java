@@ -36,24 +36,25 @@ public class AdminUserService {
 
     // 일반 관리자 승인 (SUPER_ADMIN 전용)
     public void approvePendingAdmin(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
 
-        if(user.getRole() != UserRole.PENDING_ADMIN) {
+        // 엔티티 조회 없이 조건부 업데이트 (쿼리 즉시 실행)
+        int updateRole = userRepository.updateRoleIfCurrent(userId, UserRole.PENDING_ADMIN, UserRole.ADMIN);
+
+        // 유저가 없거나 이미 다른 관리자가 승인/거절 누른 상태
+        if(updateRole == 0) {
             throw new ServiceErrorException(UserExceptionEnum.ERR_NOT_PENDING_ADMIN);
         }
-        user.changeRole(UserRole.ADMIN);
     }
 
     // 일반 관리자 승인 거절 (SUPER_ADMIN 전용)
     public void rejectPendingAdmin(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
 
-        if(user.getRole() != UserRole.PENDING_ADMIN) {
+        // 엔티티 조회 없이 조건부 업데이트 (쿼리 즉시 실행)
+        int updateRole = userRepository.updateRoleIfCurrent(userId, UserRole.PENDING_ADMIN, UserRole.REJECTED_ADMIN);
+
+        // 유저가 없거나 이미 다른 관리자가 승인/거절 누른 상태
+        if(updateRole == 0) {
             throw new ServiceErrorException(UserExceptionEnum.ERR_NOT_POSSIBLE_TO_REFUSE);
         }
-        // 거절 상태로 변경
-        user.changeRole(UserRole.REJECTED_ADMIN);
     }
 }
