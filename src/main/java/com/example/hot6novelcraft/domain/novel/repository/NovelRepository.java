@@ -16,8 +16,8 @@ public interface NovelRepository extends JpaRepository<Novel, Long>, CustomNovel
     // V1 - 소설 목록 조회 (IsDeleted확인)
     Page<Novel> findAllByIsDeletedFalse(Pageable pageable);
 
-    @Modifying(clearAutomatically = true)
-    @Query("UPDATE Novel n SET n.viewCount = n.viewCount + 1 WHERE n.id = :novelId")
+    @Modifying
+    @Query("UPDATE Novel n SET n.viewCount = n.viewCount + 1, n.updatedAt = CURRENT_TIMESTAMP WHERE n.id = :novelId")
     void incrementViewCount(@Param("novelId") Long novelId);
 
     // 작가의 삭제되지 않은 소설 ID 목록 조회

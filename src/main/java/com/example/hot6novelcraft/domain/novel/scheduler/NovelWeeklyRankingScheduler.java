@@ -23,9 +23,6 @@ public class NovelWeeklyRankingScheduler {
     private static final String REALTIME_RANKING_KEY = "ranking:novel:realtime";
     private static final String WEEKLY_RANKING_KEY = "ranking:novel:weekly";
 
-    private static final String TEMP_REALTIME_RANKING_KEY = "ranking:novel:realtime:temp";
-    private static final String TEMP_WEEKLY_RANKING_KEY = "ranking:novel:weekly:temp";
-
     /**
      * ======= [실시간 랭킹] ============
      * - 매 정각마다 초기화
@@ -46,7 +43,7 @@ public class NovelWeeklyRankingScheduler {
 
             // 데이터 없으면 최종 키 삭제 후 최신 상태 반영
             if (currentHourTopNovels.isEmpty()) {
-                redisTemplate.delete(uniqueTempKey);
+                redisTemplate.delete(REALTIME_RANKING_KEY);
                 return;
             }
 
@@ -67,7 +64,7 @@ public class NovelWeeklyRankingScheduler {
             log.error("[Redis] 랭킹 갱신 중 에러 발생, Temp Key를 청소합니다", e);
 
             // 에러 발생 시 애매한 temp key 삭제
-            redisTemplate.delete(TEMP_REALTIME_RANKING_KEY);
+            redisTemplate.delete(uniqueTempKey);
             throw e;
         }
     }
@@ -88,7 +85,7 @@ public class NovelWeeklyRankingScheduler {
             List<Novel> weeklyTopNovels = novelRepository.findWeeklyTopNovels(5);
 
             if (weeklyTopNovels.isEmpty()) {
-                redisTemplate.delete(uniqueWeeklyTempKey);
+                redisTemplate.delete(WEEKLY_RANKING_KEY);
                 return;
             }
 

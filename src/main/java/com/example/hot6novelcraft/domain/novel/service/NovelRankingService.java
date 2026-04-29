@@ -51,7 +51,7 @@ public class NovelRankingService {
         } catch (Exception e) {
             // 장애 : Redis 연결 실패 시 DB 쿼리로 우회
             log.error("[Redis 장애 발생] 랭킹 조회를 DB Fallback으로 전환합니다. type: {}, error: {}", type, e.getMessage());
-            return buildRankingFromDBFallback(redisKey, 5);
+            return buildRankingFromDBFallback(type, 5);
         }
     }
 

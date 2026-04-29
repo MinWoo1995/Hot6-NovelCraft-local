@@ -296,9 +296,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 pathMatcher.match("/api/search/**", url) ||
                 pathMatcher.match("/api/episodes/**", url) ||
                 pathMatcher.match("/api/reviews/**", url) ||
-                pathMatcher.match("/api/comments/**", url) ||
-                pathMatcher.match("/api/categories/**", url) ||
-                pathMatcher.match("/api/author/novels/**", url) ||
-                pathMatcher.match("/api/libraries/**", url);
+                pathMatcher.match("/api/commonts/**", url) ||
+                pathMatcher.match("/api/categories/**", url);
     }
 }
