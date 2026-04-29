@@ -40,6 +40,10 @@ public class User extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private UserRole role;
 
+    // 성인 인증 여부
+    @Column(nullable = true)
+    private boolean isAdultVerified = false;
+
     private String refreshToken;
 
     private boolean isDeleted;
@@ -50,6 +54,8 @@ public class User extends BaseEntity {
 
     private LocalDateTime anonymizedAt;
 
+    private LocalDateTime adultVerifiedAt;
+
     @PreUpdate
     protected void preUpdate() {
         updatedAt = LocalDateTime.now();
@@ -58,6 +64,11 @@ public class User extends BaseEntity {
     @PreRemove
     protected void preRemove() {
         deletedAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void prePersist() {
+        adultVerifiedAt = LocalDateTime.now().plusYears(1L);
     }
 
     public static User register(String email, String password, String nickname, String phoneNo, LocalDate birthday, UserRole role) {

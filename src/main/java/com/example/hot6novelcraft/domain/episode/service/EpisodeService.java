@@ -19,6 +19,7 @@ import com.example.hot6novelcraft.domain.point.repository.PointHistoryRepository
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EpisodeService {
@@ -305,8 +307,33 @@ public class EpisodeService {
 
     // 소설 조회수 +1 (어뷰징 방지)
     private void increaseNovelViewCount(Long novelId, Long userId) {
+        // 상태 값 검증 - 삭제, 보류, 휴재 상태 포함된 경우 종료 - 서하나
+        Novel novel = novelRepository.findById(novelId)
+                .orElseThrow(() -> new ServiceErrorException(NovelExceptionEnum.NOVEL_NOT_FOUND));
+
+        if (novel.isDeleted() ||
+                novel.getStatus() == NovelStatus.PENDING ||
+                novel.getStatus() == NovelStatus.HIATUS
+        ) {
+            log.debug("[조회수/랭킹 반영 제외] novelId: {} 은(는) 랭킹 및 조회수 집계 대상이 아닙니다.", novelId);
+            return;
+        }
+
         if (episodeCacheService.isFirstView(userId, novelId)) {
             novelRepository.incrementViewCount(novelId);
+        }
+
+        // 성인물 체크 로직 - 서하나
+        boolean isAdult = novel.getTags() != null &&
+                (novel.getTags().contains("성인") || novel.getTags().contains("19금"));
+
+        // 퍼블릭 메인 랭킹 반영 여부 결정
+        if (!isAdult) {
+            // 일반 작품만 전체 랭킹 점수 증가
+            episodeCacheService.increaseRankingScore(novelId);
+        } else {
+            // 성인 작품은 메인 랭킹 적재 차단 (추후 성인물 전용 랭킹이 생긴다면 추가)
+            log.debug("[메인 랭킹 집계 제외] novelId: {} 은(는) 성인물입니다.", novelId);
         }
 
         // Redis 랭킹 Zset 조회수 증가 호출 - 서하나

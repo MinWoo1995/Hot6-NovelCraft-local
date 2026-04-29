@@ -129,22 +129,43 @@ public class JwtFilter extends OncePerRequestFilter {
         if (jwtUtil.validateToken(accessToken)) {
 
             // Redis 블랙리스트 검사
-            if (redisUtil.isBlackList(accessToken)) {
+            try {
+                // Redis 정상 동작
+                if (redisUtil.isBlackList(accessToken)) {
+                    log.warn("블랙리스트에 등록된 토큰입니다.");
+                    response.setCharacterEncoding("UTF-8");
+                    sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "토큰이 유효하지 않습니다.");
+                    return;
+                }
+            } catch (org.springframework.data.redis.RedisConnectionFailureException e) {
+                // Redis 장애 상황 발생 (선택적 차단 로직 동작)
+                log.error("[Redis 장애] 블랙리스트 확인 불가, URL: {}", requestURL);
 
-                log.warn("블랙리스트에 등록된 토큰입니다.");
-                response.setCharacterEncoding("UTF-8");
-                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "토큰이 유효하지 않습니다.");
+                // 중요 보안 API (결제, 수정, 삭제 등) : Fail-Closed 무조건 차단
+                if(isCriticalApi(requestURL)) {
+                    log.error("[Redis 장애] 보안을 위해 중요 API 접근을 차단합니다. URL: {}", requestURL);
+                    sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "서버 불안정으로 해당 기능을 사용할 수 없습니다.");
+                    return;
+
+                }
+
+                // 일반 조회 API (소설 읽기, 랭킹 보기 등) : Fail-Open 가용성을 위해 허용
+                log.warn("[Redis 장애] 가용성을 위해 일반 API 접근을 허용합니다. URL: {}", requestURL);
+            } catch (Exception e) {
+                log.error("Redis 검증 중 알 수 없는 에러 발생", e);
+                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "서버 오류가 발생했습니다.");
                 return;
             }
 
-            // 인증 실패 시 return
-            if (!setAuthentication(response, accessToken, requestURL)) {
-                return;
-            }
+                // 인증 실패 시 return
+                if (!setAuthentication(response, accessToken, requestURL)) {
+                    return;
+                }
 
-            // AccessToken 인증인가 필터 종료
-            filterChain.doFilter(request, response);
-            return;
+                // AccessToken 인증인가 필터 종료
+                filterChain.doFilter(request, response);
+                return;
+
         }
 
         log.info("[Silent Refresh] AccessToken 만료 감지. URL: {}", requestURL);
@@ -257,5 +278,18 @@ public class JwtFilter extends OncePerRequestFilter {
         } catch (IOException e) {
             log.error("에러 응답 전송 실패: {}", e.getMessage());
         }
+    }
+
+    // 차단할 중요 API 리스트 판별 메서드
+    private boolean isCriticalApi(String url) {
+        return url.startsWith("/api/payments/prepare") ||       // 결제 준비
+                url.startsWith("/api/payments/confirm") ||      // 결제 확인
+                url.startsWith("/api/payments/refunds") ||      // 환불 하기
+                url.startsWith("/api/revenue/me/exchanges") ||  // 환전 신청
+                url.startsWith("/api/auth/signup/reader") ||    // 비밀번호 변경
+                url.startsWith("/api/users/me/reader") ||       // 회원정보수정 (작가)
+                url.startsWith("/api/auth/users/me/author") ||  // 회원정보수정 (독자)
+                url.startsWith("/api/auth/users/me") ||         // 회원정보수정 (공통)
+                url.startsWith("/api/admin/**");                // 관리자
     }
 }
