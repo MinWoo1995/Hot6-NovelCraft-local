@@ -118,6 +118,7 @@ public class DataInitializer implements ApplicationRunner {
                     .password(passwordEncoder.encode("super1234567!"))
                     .nickname("최고 관리자")
                     .phoneNo("01010002000")
+                    .birthday(java.time.LocalDate.of(2000, 1, 1))
                     .role(UserRole.SUPER_ADMIN)
                     .build();
 
