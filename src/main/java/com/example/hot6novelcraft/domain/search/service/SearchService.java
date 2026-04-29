@@ -41,15 +41,15 @@ public class SearchService {
      3. 작가 통합 검색
      =================================== */
     public Page<NovelSearchResponse> searchNovelsV1(String keyword, Pageable pageable) {
-        return customSearchRepository.searchNovelsByTitle(keyword, pageable, false);
+        return customSearchRepository.searchNovelsByTitle(keyword, pageable, true);
     }
 
     public List<TagGroupSearchResponse> searchByTagsV1(List<String> tags) {
-        return customSearchRepository.searchNovelsByTags(tags, false);
+        return customSearchRepository.searchNovelsByTags(tags, true);
     }
 
     public IntegratedAuthorSearchResponse searchAuthorsV1(String keyword) {
-        return customSearchRepository.searchByAuthorKeyword(keyword, false);
+        return customSearchRepository.searchByAuthorKeyword(keyword, true);
     }
 
     /** ============ V2 ============

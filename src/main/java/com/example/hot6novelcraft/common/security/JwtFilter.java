@@ -148,8 +148,6 @@ public class JwtFilter extends OncePerRequestFilter {
                 // 중요 보안 API (결제, 수정, 삭제 등) : Fail-Closed 무조건 차단
                 if(isSafeApi(request)) {
                     log.warn("[Redis 장애] 가용성을 위해 읽기 전용 API 접근을 허용합니다. URL: {}", requestURL);                    sendErrorResponse(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE, "서버 불안정으로 해당 기능을 사용할 수 없습니다.");
-                    return;
-
                 } else {
                     log.error("[Redis 장애] 데이터 보호를 위해 해당 API 접근을 기본 차단합니다. URL: {}", requestURL);
                     sendErrorResponse(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE, "현재 서버 불안정으로 해당 기능을 사용할 수 없습니다.");
@@ -297,7 +295,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 pathMatcher.match("/api/search/**", url) ||
                 pathMatcher.match("/api/episodes/**", url) ||
                 pathMatcher.match("/api/reviews/**", url) ||
-                pathMatcher.match("/api/commonts/**", url) ||
+                pathMatcher.match("/api/comments/**", url) ||
                 pathMatcher.match("/api/categories/**", url);
     }
 }

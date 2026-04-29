@@ -93,10 +93,14 @@ public class AuthController {
             @RequestBody PhoneVerifyRequest request,
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
+        String registeredPhone = userDetails.getUser().getPhoneNo();
+        if (!registeredPhone.equals(request.phoneNo())) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_PHONE_NOT_VERIFIED);
+        }
         // 프론트에서 받아온 인증번호로 SMS 인증 통과 여부 검증
-        smsService.verifyAuthCode(request.phoneNo(), request.verificationCode());
+        smsService.verifyAuthCode(registeredPhone, request.verificationCode());
 
-        // 인증 통과 -> 재발행
+        // 토큰 갱신 필요 시 새 액세스 토큰 발급 및 응답에 포함
         smsService.completeAdultVerification(userDetails.getUser().getId());
         return ResponseEntity.ok(BaseResponse.success("200", "성인 인증이 갱신되었습니다", null));
     }

@@ -127,7 +127,7 @@ public class CustomSearchRepositoryImpl implements CustomSearchRepository {
                 .join(authorProfile).on(user.id.eq(authorProfile.userId))
                 .where(user.nickname.containsIgnoreCase(keyword)
                 , user.isDeleted.eq(false)
-                , isAdultFilter(isAdult))
+                )
                 .fetch();
 
         // 작가 ID 목록 추출
