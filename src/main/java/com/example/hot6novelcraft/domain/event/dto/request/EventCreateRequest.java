@@ -1,9 +1,6 @@
 package com.example.hot6novelcraft.domain.event.dto.request;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 import java.time.LocalDateTime;
 
@@ -19,6 +16,7 @@ public record EventCreateRequest(
         @Min(value = 1, message = "리워드 포인트는 1 이상이어야 합니다")
         Long rewardPoints,
 
+        @NotNull(message = "최대 참여 인원을 입력해 주세요")
         @Min(value = 1, message = "최대 참여 인원은 1명 이상이어야 합니다")
         Long maxParticipants,
 
@@ -27,5 +25,11 @@ public record EventCreateRequest(
 
         @NotNull(message = "이벤트 종료일을 입력해 주세요")
         LocalDateTime endedAt
+
 ) {
+        @AssertTrue(message = "이벤트 시작일은 종료일보다 이전이어야 합니다")
+        public boolean isValidPeriod() {
+                if (startedAt == null || endedAt == null) return true;
+                return startedAt.isBefore(endedAt);
+        }
 }

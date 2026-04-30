@@ -21,4 +21,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     // 전체
     Page<Event> findAll(Pageable pageable);
+
+    @Query("SELECT e FROM Event e WHERE e.startedAt > :now")
+    Page<Event> findAllUpcoming(@Param("now") LocalDateTime now, Pageable pageable);
 }

@@ -50,7 +50,10 @@ public class UserEventService {
 
     @Transactional(readOnly = true)
     public Page<EventSummaryResponse> getEventList(EventStatus status, Pageable pageable) {
-        String cacheKey = EVENT_LIST_CACHE_KEY + status + ":" + pageable.getPageNumber();
+        String cacheKey = EVENT_LIST_CACHE_KEY + status
+                + ":" + pageable.getPageNumber()
+                + ":" + pageable.getPageSize()
+                + ":" + pageable.getSort();
 
         Object cached = redisTemplate.opsForValue().get(cacheKey);
         if (cached != null) {
@@ -63,9 +66,9 @@ public class UserEventService {
 
         LocalDateTime now = LocalDateTime.now();
         Page<Event> events = switch (status) {
-            case ONGOING -> eventRepository.findAllOngoing(now, pageable);
-            case ENDED   -> eventRepository.findAllEnded(now, pageable);
-            default      -> eventRepository.findAll(pageable);
+            case UPCOMING -> eventRepository.findAllUpcoming(now, pageable);
+            case ONGOING  -> eventRepository.findAllOngoing(now, pageable);
+            case ENDED    -> eventRepository.findAllEnded(now, pageable);
         };
 
         Page<EventSummaryResponse> result = events.map(e -> EventSummaryResponse.from(e, status));
@@ -128,11 +131,9 @@ public class UserEventService {
             }
 
             // 선착순 인원 검증
-            if (event.getMaxParticipants() != null) {
-                long currentCount = eventParticipantRepository.countByEventId(eventId);
-                if (currentCount >= event.getMaxParticipants()) {
-                    throw new ServiceErrorException(EventExceptionEnum.EVENT_PARTICIPANTS_FULL);
-                }
+            long currentCount = eventParticipantRepository.countByEventId(eventId);
+            if (currentCount >= event.getMaxParticipants()) {
+                throw new ServiceErrorException(EventExceptionEnum.EVENT_PARTICIPANTS_FULL);
             }
 
             // 참여자 저장

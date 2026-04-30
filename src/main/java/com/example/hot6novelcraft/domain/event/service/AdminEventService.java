@@ -13,17 +13,20 @@ import com.example.hot6novelcraft.domain.event.repository.EventParticipantReposi
 import com.example.hot6novelcraft.domain.event.repository.EventRepository;
 import com.example.hot6novelcraft.domain.notification.dto.event.NotificationEvent;
 import com.example.hot6novelcraft.domain.notification.producer.NotificationProducer;
+import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -57,16 +60,20 @@ public class AdminEventService {
 
         Event saved = eventRepository.save(event);
 
-        evictEventListCache();
-
         // 사용자 목록 캐시 evict
         evictEventListCache();
 
-        // READER 전체에게 이벤트 생성 알림 발송 (트랜잭션 커밋 후 Kafka 발행)
-        userRepository.findAllByRole(UserRole.READER)
-                .forEach(user -> eventPublisher.publishEvent(
-                        NotificationEvent.eventCreated(user.getId(), saved.getTitle(), saved.getId())
-                ));
+        int page = 0;
+        int batchSize = 1000;
+        while (true) {
+            PageRequest pageRequest = PageRequest.of(page, batchSize);
+            List<User> readers = userRepository.findAllByRole(UserRole.READER, pageRequest).getContent();
+            if (readers.isEmpty()) break;
+            readers.forEach(user -> eventPublisher.publishEvent(
+                    NotificationEvent.eventCreated(user.getId(), saved.getTitle(), saved.getId())
+            ));
+            page++;
+        }
 
         return EventDetailResponse.from(saved);
     }
@@ -76,9 +83,9 @@ public class AdminEventService {
     public Page<EventSummaryResponse> getEventList(EventStatus status, Pageable pageable) {
         LocalDateTime now = LocalDateTime.now();
         Page<Event> events = switch (status) {
-            case ONGOING -> eventRepository.findAllOngoing(now, pageable);
-            case ENDED   -> eventRepository.findAllEnded(now, pageable);
-            default      -> eventRepository.findAll(pageable);
+            case UPCOMING -> eventRepository.findAllUpcoming(now, pageable);
+            case ONGOING  -> eventRepository.findAllOngoing(now, pageable);
+            case ENDED    -> eventRepository.findAllEnded(now, pageable);
         };
         return events.map(e -> EventSummaryResponse.from(e, resolveStatus(e)));
     }
