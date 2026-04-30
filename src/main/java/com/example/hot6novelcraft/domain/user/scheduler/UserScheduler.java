@@ -56,7 +56,7 @@ public class UserScheduler {
         for (String pattern : targetPatterns) {
             redisTemplate.execute((RedisConnection connection) -> {
                 // DB 부하 방지 위해 KEYS * 대신 SCAN 사용 (100개씩)
-                ScanOptions options = ScanOptions.scanOptions().match(pattern).count(1000L).build();
+                ScanOptions options = ScanOptions.scanOptions().match(pattern).count(100L).build();
 
                 try (Cursor<byte[]> cursor = connection.scan(options)) {
                     while (cursor.hasNext()) {

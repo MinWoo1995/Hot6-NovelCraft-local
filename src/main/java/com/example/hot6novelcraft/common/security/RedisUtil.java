@@ -82,7 +82,7 @@ public class RedisUtil {
         String script =
                 "local count = redis.call('INCR', KEYS[1]) \n" +
                         "if tonumber(count) == 1 then \n" +
-                        "   redis.call('EXPIRE', ARGV[1]) \n" +
+                        "   redis.call('EXPIRE', KEYS[1], ARGV[1]) \n" +
                         "end \n" +
                         "return count";
 
