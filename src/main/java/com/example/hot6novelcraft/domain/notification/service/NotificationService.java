@@ -9,6 +9,7 @@ import com.example.hot6novelcraft.domain.notification.entity.Notification;
 import com.example.hot6novelcraft.domain.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -31,8 +32,9 @@ public class NotificationService {
     public void consume(NotificationEvent event) {
         log.debug("[Kafka] 알림 수신 userId={} type={}", event.userId(), event.type());
 
-        // DB 저장: save()는 자체 트랜잭션을 가지므로 즉시 커밋됨
+        // DB 저장: eventId unique 제약으로 중복 이벤트 방어
         Notification notification = Notification.create(
+                event.eventId(),
                 event.userId(),
                 event.type(),
                 event.title(),
@@ -40,13 +42,18 @@ public class NotificationService {
                 event.referenceId(),
                 event.referenceType()
         );
-        notificationRepository.save(notification);
+        try {
+            notificationRepository.save(notification);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("[알림] 중복 이벤트 무시 eventId={} userId={} type={}", event.eventId(), event.userId(), event.type());
+            return;
+        }
 
         // WebSocket 전송: DB 커밋 후 별도로 수행, 실패해도 Kafka 재소비 방지
         try {
             NotificationResponse response = NotificationResponse.from(notification);
             messagingTemplate.convertAndSend("/topic/notifications/" + event.userId(), response);
-            log.info("[알림] 저장 및 WebSocket 전송 완료 userId={} type={}", event.userId(), event.type());
+            log.info("[알림] 저장 및 WebSocket 전송 완료 eventId={} userId={} type={}", event.eventId(), event.userId(), event.type());
         } catch (Exception e) {
             log.warn("[알림] WebSocket 전송 실패 (DB 저장은 완료) userId={} type={}", event.userId(), event.type(), e);
         }

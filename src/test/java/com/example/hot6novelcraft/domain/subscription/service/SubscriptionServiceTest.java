@@ -3,6 +3,8 @@ package com.example.hot6novelcraft.domain.subscription.service;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.SubscriptionExceptionEnum;
 import com.example.hot6novelcraft.common.security.RedisUtil;
+import com.example.hot6novelcraft.domain.notification.dto.event.NotificationEvent;
+import com.example.hot6novelcraft.domain.notification.entity.enums.NotificationType;
 import com.example.hot6novelcraft.domain.notification.producer.NotificationProducer;
 import com.example.hot6novelcraft.domain.payment.entity.Payment;
 import com.example.hot6novelcraft.domain.subscription.dto.request.SubscriptionCancelRequest;
@@ -13,6 +15,7 @@ import com.example.hot6novelcraft.domain.subscription.dto.response.SubscriptionR
 import com.example.hot6novelcraft.domain.subscription.entity.Subscription;
 import com.example.hot6novelcraft.domain.subscription.entity.enums.PlanType;
 import com.example.hot6novelcraft.domain.subscription.entity.enums.SubscriptionStatus;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.portone.sdk.server.payment.PaymentClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -57,7 +60,7 @@ class SubscriptionServiceTest {
     private RestTemplate restTemplate;
 
     @Mock
-    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private ObjectMapper objectMapper;
 
     @Mock
     private NotificationProducer notificationProducer;
@@ -208,6 +211,8 @@ class SubscriptionServiceTest {
                     .createPaymentAndPurchase(eq(USER_ID), anyString(), eq(AMOUNT));
             verify(subscriptionTransactionService, times(1))
                     .completeSubscription(SUBSCRIPTION_KEY, BILLING_KEY, PAYMENT_ID);
+            verify(notificationProducer, times(1)).publish(argThat(e ->
+                    e.userId().equals(USER_ID) && e.type() == NotificationType.SUBSCRIPTION_ACTIVATED));
         }
 
         @Test
@@ -293,6 +298,8 @@ class SubscriptionServiceTest {
             verify(restTemplate, times(1))
                     .exchange(anyString(), eq(HttpMethod.DELETE), any(HttpEntity.class), eq(String.class));
             verify(subscriptionTransactionService, times(1)).cancelSubscription(SUBSCRIPTION_ID);
+            verify(notificationProducer, times(1)).publish(argThat(e ->
+                    e.userId().equals(USER_ID) && e.type() == NotificationType.SUBSCRIPTION_CANCELLED));
         }
 
         @Test
