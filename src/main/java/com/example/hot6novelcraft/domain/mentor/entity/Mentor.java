@@ -6,11 +6,11 @@ import com.example.hot6novelcraft.common.exception.domain.MentorExceptionEnum;
 import com.example.hot6novelcraft.domain.mentor.entity.enums.MentorStatus;
 import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
+@Builder
+@AllArgsConstructor
 @Table(name = "mentors")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -59,11 +59,19 @@ public class Mentor extends BaseEntity {
     private Long version;
 
     public void approve() {
+
+        if(this.status != MentorStatus.PENDING) {
+            throw new ServiceErrorException(MentorExceptionEnum.MENTOR_ALREADY_PROCESSED);
+        }
         this.status = MentorStatus.APPROVED;
         this.rejectReason = null;
     }
 
     public void reject(String rejectReason) {
+
+        if(this.status != MentorStatus.PENDING) {
+            throw new ServiceErrorException(MentorExceptionEnum.MENTOR_ALREADY_PROCESSED);
+        }
         this.status = MentorStatus.REJECTED;
         this.rejectReason = rejectReason;
     }

@@ -2,6 +2,9 @@ package com.example.hot6novelcraft.common.config;
 
 import com.example.hot6novelcraft.domain.episode.entity.Episode;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
+import com.example.hot6novelcraft.domain.mentor.entity.Mentor;
+import com.example.hot6novelcraft.domain.mentor.entity.enums.MentorStatus;
+import com.example.hot6novelcraft.domain.mentor.repository.MentorRepository;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.entity.enums.NovelStatus;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
@@ -25,19 +28,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-//@Profile({"local", "dev", "test"})
+@Profile({"local", "dev", "test"})
 public class DataInitializer implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthorProfileRepository authorProfileRepository;
     private final NovelRepository novelRepository;
-
-    // 랭킹 테스트 및 에피소드 생성을 위한 의존성 추가
-    private final RedisTemplate<String, Object> redisTemplate;
     private final EpisodeRepository episodeRepository;
+    private final MentorRepository mentorRepository;
 
-    // 직접 쿼리를 날리기 위해 JdbcTemplate 추가
+    private final RedisTemplate<String, Object> redisTemplate;
     private final JdbcTemplate jdbcTemplate;
 
     private static final String REALTIME_RANKING_KEY = "ranking:novel:realtime";
@@ -45,17 +46,14 @@ public class DataInitializer implements ApplicationRunner {
 
     @Override
     @Transactional
-    // 슈퍼 어드민 테스트 계정 생성
     public void run(ApplicationArguments args) {
 
-        // 필수 - 슈퍼 어드민 계정은 항상 최우선으로 검증 및 생성
+        // 0. 슈퍼 어드민 계정 생성
         createSuperAdmin();
 
-        // 기존 소설/작가 데이터가 있으면 스킵 (에러 방지)
-        if (userRepository.count() > 0
-                || authorProfileRepository.count() > 0
-                || novelRepository.count() > 0) {
-            log.info("[DataInitializer] 기존 소설 데이터 존재 → 더미데이터 삽입 스킵");
+        // 기존 데이터가 있으면 스킵
+        if (userRepository.count() > 3) {
+            log.info("[DataInitializer] 기존 데이터 존재 → 더미데이터 삽입 스킵");
             return;
         }
 
@@ -66,50 +64,115 @@ public class DataInitializer implements ApplicationRunner {
         redisTemplate.delete(WEEKLY_RANKING_KEY);
 
         // ========================
-        // 1. 유저 및 작가 프로필 생성
+        // 1-1. 유저 및 작가 프로필 생성
         // ========================
         User user1 = userRepository.save(User.register("백산@test.com", passwordEncoder.encode("test1234!"), "백산", "010-1111-1111", null, UserRole.AUTHOR));
         User user2 = userRepository.save(User.register("백산아@test.com", passwordEncoder.encode("test1234!"), "백산아", "010-2222-2222", null, UserRole.AUTHOR));
-        User user3 = userRepository.save(User.register("바다작가@test.com", passwordEncoder.encode("test1234!"), "바다작가", "010-3333-3333", null, UserRole.AUTHOR));
+        User user3 = userRepository.save(User.register("바다@test.com", passwordEncoder.encode("test1234!"), "바다", "010-3333-3333", null, UserRole.AUTHOR));
 
-        authorProfileRepository.save(AuthorProfile.register(user1.getId(), "판타지 전문", CareerLevel.INTERMEDIATE, "FANTASY", null, null, null, true));
-        authorProfileRepository.save(AuthorProfile.register(user2.getId(), "로맨스 전문", CareerLevel.INTERMEDIATE, "ROMANCE", null, null, null, false));
-        authorProfileRepository.save(AuthorProfile.register(user3.getId(), "힐링 전문", CareerLevel.PROFICIENT, "HEALING", null, null, null, true));
-
-        // ========================
-        // 2. 소설 생성 및 랭킹 세팅
-        // ========================
-        saveNovelAndRanking(user1.getId(), "먼치킨 백산의 귀환", "압도적 1위 테스트", "FANTASY", "MUNCHKIN,ISEKAI", 10000, 50000);
-        saveNovelAndRanking(user2.getId(), "재벌집 로맨스", "로맨스 강자 테스트", "ROMANCE", "ROMANCE,CONTRACT", 8000, 45000);
-        saveNovelAndRanking(user3.getId(), "바다가 보이는 카페", "갑자기 어제부터 뜬 소설", "HEALING", "HEALING,ROMANCE", 7500, 10000);
-        saveNovelAndRanking(user1.getId(), "이세계 던전 공략", "꾸준한 인기 소설", "FANTASY", "DUNGEON,GROWTH", 2000, 40000);
-        saveNovelAndRanking(user3.getId(), "심해의 군주", "바다물 판타지", "FANTASY", "DUNGEON,MUNCHKIN", 5000, 30000);
-        saveNovelAndRanking(user2.getId(), "비밀스러운 계약", "잔잔한 로맨스", "ROMANCE", "ROMANCE,HEALING", 1500, 8000);
-        saveNovelAndRanking(user1.getId(), "삭제될 운명의 소설", "삭제 테스트", "FANTASY", "TEST", 0, 0);
-        saveNovelAndRanking(user3.getId(), "성인 인증 테스트 소설", "성인 인증 테스트", "HORROR", "ADULT", 7000, 43000);
+        authorProfileRepository.save(AuthorProfile.register(user1.getId(), "판타지 전문", CareerLevel.INTRODUCTION, "FANTASY", null, null, null, true));
+        authorProfileRepository.save(AuthorProfile.register(user2.getId(), "로맨스판타지 전문", CareerLevel.INTERMEDIATE, "ROMANCE_FANTASY", null, null, null, false));
+        authorProfileRepository.save(AuthorProfile.register(user3.getId(), "현대 전문", CareerLevel.PROFICIENT, "MODERN", null, null, null, true));
 
         // ========================
-        // 3. 신작 조회 테스트용 날짜 강제 조작 (JPA Auditing 무시하고 직접 SQL 실행)
+        // 1-2. 유저 및 독자 프로필 생성
+        // ========================
+        User reader1 = userRepository.save(User.register("reader_today1@test.com", passwordEncoder.encode("test1234!"), "오늘가입독자1", "010-9000-1001", null, UserRole.READER));
+        User reader2 = userRepository.save(User.register("reader_today2@test.com", passwordEncoder.encode("test1234!"), "오늘가입독자2", "010-9000-1002", null, UserRole.READER));
+        User reader3 = userRepository.save(User.register("reader_past@test.com", passwordEncoder.encode("test1234!"), "예전가입독자", "010-9000-1003", null, UserRole.READER));
+        User reader4 = userRepository.save(User.register("reader_del@test.com", passwordEncoder.encode("test1234!"), "탈퇴한독자", "010-9000-1004", null, UserRole.READER));
+
+
+        // ========================
+        // 2. 멘토 승인/거절 테스트용 데이터 (주석 해제 후 교체)
+        // ========================
+
+        User mentorCandidate1 = userRepository.save(User.register("mentor_ok@test.com", passwordEncoder.encode("test1234!"), "승인테스트유저", "010-1000-1000", null, UserRole.AUTHOR));
+        authorProfileRepository.save(AuthorProfile.register(mentorCandidate1.getId(), "멘토가 되고 싶습니다.", CareerLevel.PROFICIENT, "FANTASY", null, null, null, true));
+
+        User mentorCandidate2 = userRepository.save(User.register("mentor_reject@test.com", passwordEncoder.encode("test1234!"), "거절테스트유저", "010-2000-2000", null, UserRole.AUTHOR));
+        authorProfileRepository.save(AuthorProfile.register(mentorCandidate2.getId(), "수상 내역 첨부합니다.", CareerLevel.PROFICIENT, "ROMANCE", null, null, null, true));
+
+        User mentorCandidate3 = userRepository.save(User.register("mentor_fail@test.com", passwordEncoder.encode("test1234!"), "자격미달유저", "010-3000-3000", null, UserRole.AUTHOR));
+        authorProfileRepository.save(AuthorProfile.register(mentorCandidate3.getId(), "멘토 시켜주세요", CareerLevel.INTERMEDIATE, "HORROR", null, null, null, false));
+
+        // 빌더 대신 안전한 Mentor.create() 메서드 사용!
+        // Case 1: 승인 테스트 (숙련자, 파일 O)
+        mentorRepository.save(Mentor.create(
+                mentorCandidate1.getId(), CareerLevel.PROFICIENT, null, null, null, null,
+                "공모전_대상_증명서.pdf", 5, true, null, MentorStatus.PENDING
+        ));
+
+        // Case 2: 거절 테스트 (숙련자, 파일 O)
+        mentorRepository.save(Mentor.create(
+                mentorCandidate2.getId(), CareerLevel.PROFICIENT, null, null, null, null,
+                "타플랫폼_연재_경력증명서.png", 3, false, null, MentorStatus.PENDING
+        ));
+
+        // Case 3: 조건 미달 테스트 (중급자, 파일 X)
+        mentorRepository.save(Mentor.create(
+                mentorCandidate3.getId(), CareerLevel.INTERMEDIATE, null, null, null, null,
+                null, 1, true, null, MentorStatus.PENDING
+        ));
+
+        // ========================
+        // 3. 소설 생성 및 랭킹 세팅 (날짜 조작 SQL을 위해 순서 유지 필수)
+        // ========================
+        // 정상 노출 데이터 (1달 이내)
+        saveNovelAndRanking(user1.getId(), "먼치킨 백산의 귀환", "압도적 1위 테스트", "FANTASY", "MUNCHKIN,ISEKAI", 10000, 50000); // ID: 1
+        saveNovelAndRanking(user2.getId(), "재벌집 로맨스", "로맨스 강자 테스트", "ROMANCE", "ROMANCE,CONTRACT", 8000, 45000); // ID: 2
+        saveNovelAndRanking(user3.getId(), "비밀스러운 계약", "잔잔한 로맨스", "ROMANCE", "ROMANCE,HEALING", 1500, 8000); // ID: 3
+
+        // 기간 초과 데이터 (1달 초과 - 리스트에 안 나와야 함)
+        saveNovelAndRanking(user1.getId(), "바다가 보이는 카페", "갑자기 어제부터 뜬 소설", "HEALING", "HEALING,ROMANCE", 7500, 10000); // ID: 4
+        saveNovelAndRanking(user2.getId(), "심해의 군주", "바다물 판타지", "FANTASY", "DUNGEON,MUNCHKIN", 5000, 30000); // ID: 5
+
+        // 상태 불만족 데이터 (보류 및 삭제)
+        saveNovelAndRanking(user3.getId(), "보류중인 소설", "관리자 확인 필요", "HORROR", "ADULT", 7000, 43000); // ID: 6
+        saveNovelAndRanking(user1.getId(), "삭제될 운명의 소설", "삭제 테스트", "FANTASY", "TEST", 0, 0); // ID: 7
+
+        saveNovelAndRanking(user3.getId(), "성인 인증 테스트 소설", "성인 인증 테스트", "HORROR", "ADULT", 7000, 43000); // ID: 8
+
+        // ========================
+        // 4. 신작 조회 테스트용 날짜 강제 조작 (JPA Auditing 무시)
         // ========================
         log.info("[DataInitializer] 테스트용 소설 생성일자 조작 시작...");
 
-        // 정상 노출 데이터 (1달 이내)
+        // 정상 노출 (ID 1, 2, 3)
         jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 1 DAY), status = 'ONGOING', is_deleted = false WHERE id = 1");
         jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 15 DAY), status = 'ONGOING', is_deleted = false WHERE id = 2");
         jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 29 DAY), status = 'ONGOING', is_deleted = false WHERE id = 3");
 
-        // 기간 초과 데이터 (1달 초과 - 리스트에 안 나와야 함)
+        // 기간 초과 (ID 4, 5)
         jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 2 MONTH), status = 'ONGOING', is_deleted = false WHERE id = 4");
         jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 6 MONTH), status = 'ONGOING', is_deleted = false WHERE id = 5");
 
-        // 상태 불만족 데이터
+        // 상태 불만족 (ID 6 - 보류, ID 7 - 삭제)
+        jdbcTemplate.execute("UPDATE novels SET created_at = NOW(), status = 'PENDING', is_deleted = false WHERE id = 6");
+        jdbcTemplate.execute("UPDATE novels SET created_at = NOW(), status = 'ONGOING', is_deleted = true WHERE id = 7");
+
+        // ========================
+        // 4. JDBC를 이용한 생성일자 및 탈퇴 상태 강제 조작 (통계 테스트용)
+        // ========================
+        log.info("[DataInitializer] 테스트용 데이터 상태/일자 강제 조작 시작...");
+
+        // 유저(독자) 데이터 조작
+        // id를 하드코딩하면 위험하므로 email로 조작합니다.
+        jdbcTemplate.execute("UPDATE users SET created_at = DATE_SUB(NOW(), INTERVAL 10 DAY) WHERE email = 'reader_past@test.com'");
+        jdbcTemplate.execute("UPDATE users SET is_deleted = true WHERE email = 'reader_del@test.com'");
+
+        // 소설 데이터 조작
+        jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 1 DAY), status = 'ONGOING', is_deleted = false WHERE id = 1");
+        jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 15 DAY), status = 'ONGOING', is_deleted = false WHERE id = 2");
+        jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 29 DAY), status = 'ONGOING', is_deleted = false WHERE id = 3");
+        jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 2 MONTH), status = 'ONGOING', is_deleted = false WHERE id = 4");
+        jdbcTemplate.execute("UPDATE novels SET created_at = DATE_SUB(NOW(), INTERVAL 6 MONTH), status = 'ONGOING', is_deleted = false WHERE id = 5");
         jdbcTemplate.execute("UPDATE novels SET created_at = NOW(), status = 'PENDING', is_deleted = false WHERE id = 6");
         jdbcTemplate.execute("UPDATE novels SET created_at = NOW(), status = 'ONGOING', is_deleted = true WHERE id = 7");
 
         log.info("[DataInitializer] 더미데이터 및 Redis 랭킹 세팅 완료");
     }
 
-    // 슈퍼 어드민 생성 전용 헬퍼 메서드
     private void createSuperAdmin() {
         if(!userRepository.existsByEmail("super@admin.com")) {
             User superAdmin = User.builder()
@@ -124,37 +187,40 @@ public class DataInitializer implements ApplicationRunner {
             userRepository.save(superAdmin);
             log.info("==== [system] 슈퍼 어드민 테스트 계정 생성 완료 ====");
         }
+
+        // 2. 일반 관리자 (ADMIN) - 추가!
+        if(!userRepository.existsByEmail("normal@admin.com")) {
+            User normalAdmin = User.builder()
+                    .email("normal@admin.com")
+                    .password(passwordEncoder.encode("admin1234!"))
+                    .nickname("일반 관리자")
+                    .phoneNo("01020003000")
+                    .birthday(java.time.LocalDate.of(1995, 5, 5))
+                    .role(UserRole.ADMIN)
+                    .build();
+            userRepository.save(normalAdmin);
+        }
     }
 
-    /**
-     * 소설 DB 저장 및 Redis ZSET 랭킹 반영 + 에피소드(1화) 자동 생성 헬퍼 메서드
-     */
     private Long saveNovelAndRanking(Long authorId, String title, String description, String genre, String tags,
                                      double realtimeScore, double weeklyScore) {
-
-        // 1. DB에 소설 저장
+        // 1. 소설 저장
         Novel novel = Novel.createNovel(authorId, title, description, genre, tags);
         Novel saved = novelRepository.save(novel);
         saved.changeStatus(NovelStatus.ONGOING);
         novelRepository.save(saved);
 
-        // 2. 소설이 만들어지면 무조건 1화를 같이 생성하고 발행!
+        // 2. 에피소드 저장
         Episode episode = Episode.createEpisode(
-                saved.getId(),   // novelId
-                1,               // 1화
-                title + " - 1화", // 에피소드 제목
-                "이것은 테스트를 위한 " + title + "의 1화 본문입니다. 여기서 어뷰징 방지 및 조회수 로직이 작동합니다.", // 본문
-                true,            // 무료 여부
-                0                // 포인트 가격
+                saved.getId(), 1, title + " - 1화", "이것은 테스트를 위한 " + title + "의 1화 본문입니다.", true, 0
         );
-
-        episode.publish(); // 발행 상태로 변경해야 API로 조회 가능
+        episode.publish();
         episodeRepository.save(episode);
 
-        // 3. Redis ZSET에 랭킹 스코어(조회수) 등록
+        // 3. 랭킹 스코어 반영
         redisTemplate.opsForZSet().incrementScore(REALTIME_RANKING_KEY, String.valueOf(saved.getId()), realtimeScore);
         redisTemplate.opsForZSet().incrementScore(WEEKLY_RANKING_KEY, String.valueOf(saved.getId()), weeklyScore);
 
-        return saved.getId(); // 강제 업데이트를 위해 ID 반환
+        return saved.getId();
     }
 }

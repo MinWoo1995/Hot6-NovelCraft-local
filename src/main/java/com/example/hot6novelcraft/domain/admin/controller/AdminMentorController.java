@@ -18,7 +18,7 @@ public class AdminMentorController {
 
     private final AdminMentorService adminMentorService;
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/pending")
     public ResponseEntity<BaseResponse<List<AdminPendingMentorResponse>>> getPendingMentors() {
         List<AdminPendingMentorResponse> responses = adminMentorService.getPendingProficientMentors();
@@ -26,7 +26,7 @@ public class AdminMentorController {
         return ResponseEntity.ok(BaseResponse.success("200", "숙련 (PROFICIENT) 등급 심사 대기 목록 조회 완료", responses));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
     @PatchMapping("/{mentorId}/approve")
     public ResponseEntity<BaseResponse<Void>> approveMentor(
             @PathVariable Long mentorId
@@ -35,7 +35,7 @@ public class AdminMentorController {
         return ResponseEntity.ok(BaseResponse.success("200","멘토 등급 심사 승급 완료",null));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
     @PatchMapping("/{mentorId}/reject")
     public ResponseEntity<BaseResponse<AdminMentorRejectRequest>> rejectMentor(
             @PathVariable Long mentorId,
