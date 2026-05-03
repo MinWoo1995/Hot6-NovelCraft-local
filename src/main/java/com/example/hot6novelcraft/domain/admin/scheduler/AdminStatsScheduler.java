@@ -64,7 +64,7 @@ public class AdminStatsScheduler {
 
         } finally {
             // 락 해제
-            redisUtil.releaseLock(STATISTICS_SCHEDULER_LOCK_KEY);
+            redisUtil.releaseLock(lockKey);
         }
     }
 }

@@ -24,13 +24,6 @@ public class AdminCacheService {
 
     private static final long CACHE_TTL_SECONDS = 60 * 60 * 48; // 48시간
 
-    // 00시 자정까지 남은 시간을 초 단위로 계산
-    public static long getMidnightTime() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime midnight = LocalDate.now().plusDays(1).atStartOfDay();
-        return ChronoUnit.SECONDS.between(now, midnight);
-    }
-
     // 오늘 신규 가입 회원 수 조회 (캐시 먼저 -> 없으면 DB -> DB 결과 캐시 저장)
     public Long getNewUsersByDate() {
         String key = getTodayUsersKey();

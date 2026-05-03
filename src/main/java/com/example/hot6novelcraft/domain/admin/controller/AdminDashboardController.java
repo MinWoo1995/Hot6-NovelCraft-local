@@ -25,23 +25,6 @@ import java.time.LocalDate;
 public class AdminDashboardController {
 
     private final AdminDashboardService adminDashboardService;
-    private final AdminCacheService adminCacheService;
-    private final AdminStatsScheduler adminStatsScheduler;
-
-    // 테스트용
-    @GetMapping("test/increment")
-    public String testIncrement() {
-        adminCacheService.incrementNewUsersToday();
-        adminCacheService.incrementNewNovelsToday();
-        adminCacheService.incrementNewMentorsToday();
-        return "Redis 카운트 +1 증가 완료!";
-    }
-
-    @GetMapping("test/scheduler")
-    public String testScheduler() {
-        adminStatsScheduler.saveDailyStatistics();
-        return "스케쥴러 수동 실행 완료! (DB 확인 하기)";
-    }
 
     /** ======= v1 쿼리 분할 ======= **/
     @GetMapping("/v1")
@@ -62,7 +45,6 @@ public class AdminDashboardController {
             , @RequestParam(required = false, defaultValue = "ALL") String novelTotalStatus
             , @RequestParam(required = false) NovelStatus novelStatus
             , @RequestParam(required = false) Boolean isDeleted
-
     ) {
         AdminDashboardResponse response = adminDashboardService.getDashboardStatusIntegrated(role, novelTotalStatus, novelStatus, isDeleted);
         return ResponseEntity.ok(BaseResponse.success("200", "V2 병합 - 통계 출력 완료", response));
@@ -88,5 +70,4 @@ public class AdminDashboardController {
         AdminDashboardResponse response = adminDashboardService.getHistoryDashBoard(targetDate);
         return ResponseEntity.ok(BaseResponse.success("200", "과거 신규 통계 출력 완료", response));
     }
-
 }
