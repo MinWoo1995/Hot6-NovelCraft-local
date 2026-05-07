@@ -1,5 +1,6 @@
 package com.example.hot6novelcraft.domain.coverai.client;
 
+import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.CoverExceptionEnum;
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentConfig;
@@ -53,6 +54,8 @@ public class GeminiClient {
 
             throw CoverExceptionEnum.IMAGE_GENERATION_FAILED.toException();
 
+        } catch (ServiceErrorException e) {
+            throw e; // 그대로 rethrow
         } catch (Exception e) {
             log.error("[Gemini] 이미지 생성 실패: {}", e.getMessage(), e);
             throw CoverExceptionEnum.IMAGE_GENERATION_FAILED.toException();

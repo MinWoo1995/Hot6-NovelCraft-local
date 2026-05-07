@@ -1,5 +1,6 @@
 package com.example.hot6novelcraft.domain.coverai.service;
 
+import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.CoverExceptionEnum;
 import com.example.hot6novelcraft.domain.coverai.client.GeminiClient;
 import com.example.hot6novelcraft.domain.coverai.dto.response.CoverCreateResponse;
@@ -31,12 +32,10 @@ public class CoverService {
     private final NovelRepository novelRepository;
     private final S3Client s3Client;
     private final UserRepository userRepository;
-    private static final Long COVER_COST = 300L; // 표지 생성 비용 300포인트
     private final PointHistoryRepository pointHistoryRepository;
     private final PointService pointService;
 
-
-
+    private static final Long COVER_COST = 300L;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
@@ -62,18 +61,16 @@ public class CoverService {
             throw CoverExceptionEnum.NOT_NOVEL_OWNER.toException();
         }
 
-        // 3. 포인트 차감
-        pointService.deduct(userId, COVER_COST);
-
-        // 4. 포인트 히스토리 저장
-        pointHistoryRepository.save(
-                PointHistory.create(userId, novelId, null, COVER_COST, PointHistoryType.AI_COVER, "AI 소설 표지 생성")
-        );
-
-        // 5. 프롬프트 생성 → Gemini 호출 → S3 업로드
+        // 3. 외부 API 먼저 호출 (실패 시 포인트 소실 방지)
         String prompt = buildPrompt(novel, user.getNickname());
         byte[] imageBytes = geminiClient.generateImage(prompt);
         String s3Url = uploadToS3(imageBytes, novelId);
+
+        // 4. 성공 후 포인트 차감 및 이력 저장
+        pointService.deduct(userId, COVER_COST);
+        pointHistoryRepository.save(
+                PointHistory.create(userId, novelId, null, COVER_COST, PointHistoryType.AI_COVER, "AI 소설 표지 생성")
+        );
 
         return CoverCreateResponse.of(novelId, s3Url);
     }
@@ -95,6 +92,8 @@ public class CoverService {
             log.info("[Cover] S3 업로드 성공: {}", s3Url);
             return s3Url;
 
+        } catch (ServiceErrorException e) {
+            throw e;
         } catch (Exception e) {
             log.error("[Cover] S3 업로드 실패", e);
             throw CoverExceptionEnum.IMAGE_UPLOAD_FAILED.toException();
