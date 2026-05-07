@@ -2,6 +2,8 @@ package com.example.hot6novelcraft.domain.aichat.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -10,17 +12,23 @@ import reactor.core.publisher.Flux;
 public class AiChatService {
 
     private final ChatClient customerServiceChatClient;
+    private final ChatMemory chatMemory;
 
     public Flux<String> chat(Long userId, String message) {
-        // 1단계: 시스템 프롬프트만으로 기본 동작 확인
-        // conversationId는 2단계(대화 메모리 연결)에서 활성화
+        // 사용자별 고유 대화 ID: 같은 userId면 항상 같은 히스토리를 불러옴
+        String conversationId = "ai-support:" + userId;
+
         return customerServiceChatClient.prompt()
                 .user(message)
+                .advisors(MessageChatMemoryAdvisor.builder(chatMemory)
+                        .conversationId(conversationId)
+                        .build())
                 .stream()
                 .content();
     }
 
     public void clearSession(Long userId) {
-        // 2단계(대화 메모리 연결)에서 구현 예정
+        String conversationId = "ai-support:" + userId;
+        chatMemory.clear(conversationId);
     }
 }
