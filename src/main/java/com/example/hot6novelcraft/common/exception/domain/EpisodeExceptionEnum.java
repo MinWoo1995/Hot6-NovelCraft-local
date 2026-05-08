@@ -29,6 +29,7 @@ public enum EpisodeExceptionEnum implements ErrorCode {
     AI_REVIEW_FORBIDDEN(HttpStatus.FORBIDDEN, "본인 소설의 회차에만 AI 리뷰를 받을 수 있습니다."),
     AI_REVIEW_ONLY_DRAFT(HttpStatus.BAD_REQUEST, "발행 전(초안) 상태의 회차만 AI 리뷰를 받을 수 있습니다."),
     AI_REVIEW_CONTENT_EMPTY(HttpStatus.BAD_REQUEST, "본문이 없어 AI 리뷰를 받을 수 없습니다."),
+    AI_REVIEW_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "AI 리뷰 작업을 찾을 수 없습니다. 만료되었거나 잘못된 조회 입니다."),
     AI_REVIEW_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "AI 리뷰 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
 
     private final HttpStatus httpStatus;
