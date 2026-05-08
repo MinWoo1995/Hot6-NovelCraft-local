@@ -73,7 +73,7 @@ public class AiReviewService {
             throw new ServiceErrorException(EpisodeExceptionEnum.AI_REVIEW_CONTENT_EMPTY);
         }
 
-        // 포인트 잔액 체크
+        // 포인트 잔액 체크 - 테스트할때 주석
         Long balance = pointService.getBalance(userId);
         if (balance < AI_REVIEW_COST) {
             throw new ServiceErrorException(PaymentExceptionEnum.ERR_INSUFFICIENT_POINT);
@@ -89,7 +89,7 @@ public class AiReviewService {
             throw new ServiceErrorException(EpisodeExceptionEnum.AI_REVIEW_GENERATION_FAILED);
         }
 
-        // AI 호출 후 포인트 차감
+        // AI 호출 후 포인트 차감 - 테스트할때 주석
         pointService.deductForAi(userId, AI_REVIEW_COST, episodeId);
         log.info("[AI 리뷰 포인트 차감] userId={}, amount={}P, episodeId={}",
                 userId, AI_REVIEW_COST, episodeId);
@@ -124,7 +124,7 @@ public class AiReviewService {
             throw new ServiceErrorException(EpisodeExceptionEnum.AI_REVIEW_CONTENT_EMPTY);
         }
 
-        // 포인트 잔액 사전 체크 (Kafka 발행 전 미리 검증해서 무의미한 호출 방지)
+        // 포인트 잔액 사전 체크 (Kafka 발행 전 미리 검증해서 무의미한 호출 방지) - 테스트할때 주석
         Long balance = pointService.getBalance(userId);
         if (balance < AI_REVIEW_COST) {
             throw new ServiceErrorException(PaymentExceptionEnum.ERR_INSUFFICIENT_POINT);
@@ -183,7 +183,7 @@ public class AiReviewService {
             return;
         }
 
-        // 포인트 차감
+        // 포인트 차감 - 테스트할때 주석
         try {
             pointService.deductForAi(userId, AI_REVIEW_COST, episodeId);
             log.info("[AI 리뷰 v2 포인트 차감] userId={}, amount={}P, episodeId={}",
