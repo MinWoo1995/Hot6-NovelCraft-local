@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -25,6 +26,8 @@ public class KnowledgeBaseLoader {
 
     private final VectorStore vectorStore;
     private final ResourceLoader resourceLoader;
+
+    private static final String FAQ_SOURCE_TYPE = "faq";
 
     private static final List<String> FAQ_FILES = Arrays.asList(
             "classpath:ai/knowledge/faq-payment.md",
@@ -40,8 +43,13 @@ public class KnowledgeBaseLoader {
      */
     @PostConstruct
     public void load() {
+        // source_type == 'faq' 메타데이터로 정확히 필터링 → 유사도 검색 오탐 방지
         List<Document> existing = vectorStore.similaritySearch(
-                SearchRequest.builder().query("NovelCraft FAQ").topK(1).build()
+                SearchRequest.builder()
+                        .query("FAQ")
+                        .topK(1)
+                        .filterExpression("source_type == '" + FAQ_SOURCE_TYPE + "'")
+                        .build()
         );
         if (!existing.isEmpty()) {
             log.info("FAQ 문서가 이미 VectorStore에 존재합니다. 적재를 건너뜁니다.");
@@ -68,7 +76,9 @@ public class KnowledgeBaseLoader {
                 log.warn("FAQ 파일을 찾을 수 없습니다: {}", path);
                 return Stream.empty();
             }
-            return new TextReader(resource).get().stream();
+            // 각 청크에 source_type 메타데이터 태깅 → 이후 필터 검색에 사용
+            return new TextReader(resource).get().stream()
+                    .peek(doc -> doc.getMetadata().put("source_type", FAQ_SOURCE_TYPE));
         } catch (Exception e) {
             log.error("FAQ 파일 읽기 실패: {} - {}", path, e.getMessage());
             return Stream.empty();
