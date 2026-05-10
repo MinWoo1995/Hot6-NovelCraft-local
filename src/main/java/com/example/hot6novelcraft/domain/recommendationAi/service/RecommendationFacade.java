@@ -11,6 +11,7 @@ import com.example.hot6novelcraft.domain.recommendationAi.dto.UserBehaviorSummar
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -90,7 +91,9 @@ public class RecommendationFacade {
         if(recommendedIds.isEmpty()) {
             log.warn("[AI 추천] 추천 실패 -> 인기 소설로 대체 userId: {}", userId);
 
-            return getFallbackRecommendation();
+            RecommendationResponse response = getFallbackRecommendation();
+            redisTemplate.opsForValue().set(cacheKey, response, CACHE_TTL);
+            return response;
         }
 
         // 선호 장르 정보를 behavior이랑 같이 AI 전달
@@ -178,7 +181,7 @@ public class RecommendationFacade {
 
     // AI에게 넘길 후보 소설 목록 조회 - 연재(ongoing), 완결(completed) 상태만 최신순 50개로 제한
     private List<NovelSummaryForAi> getCandidateNovels() {
-        return novelRepository.findTop50ForRecommendation()
+        return novelRepository.findTop50ForRecommendation(PageRequest.of(0, 50))
                 .stream()
                 .map(n -> new NovelSummaryForAi(
                         n.getId()
@@ -193,7 +196,13 @@ public class RecommendationFacade {
 
     // 추천 ID 순서 유지하면서 소설 목록 조회
     private List<NovelListResponse> getNovelsByIds(List<Long> novelIds) {
-        Map<Long, Novel> novelMap = novelRepository.findAllById(novelIds)
+
+        // AI가 빈 결과를 줬을 때 바로 DB 결과가 아닌 빈 리스트 반환
+        if(novelIds == null || novelIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<Long, Novel> novelMap = novelRepository.findActiveNovelsByIds(novelIds)
                 .stream()
                 .collect(Collectors.toMap(Novel::getId, novel -> novel));
 
@@ -269,7 +278,7 @@ public class RecommendationFacade {
 
     // Redis에도 없을 때 DB 조회
     private RecommendationResponse getFallbackFromDb() {
-        List<Novel> popular = novelRepository.findTop10ByIsDeletedFalseOrderByViewCountDesc();
+        List<Novel> popular = novelRepository.findFallbackNovels(PageRequest.of(0, 10)).getContent();
 
         List<NovelListResponse> novels = popular.stream()
                 .map(n -> NovelListResponse.of(
@@ -339,7 +348,7 @@ public class RecommendationFacade {
         double preferredRatio = total == 0 ? 0 :(double) preferredCount / total *100;
 
         // 한 줄로 모든 정보 기록 -> grep으로 쉽게 필터링
-        log.info("[AI추천결과] userId={} type={} 소요={}ms 추천수={} 선호장르={} 선호장르비율={}% 장르분포={}",
+        log.info("[AI추천결과] userId: {}, type: {} 소요: {}ms, 추천수: {}, 선호장르: {}, 선호장르비율: {}%, 장르분포: {}",
                 userId, type, elapsedMs, total, topPreferredGenre, preferredRatio, resultGenreCount);
-}
+    }
 }

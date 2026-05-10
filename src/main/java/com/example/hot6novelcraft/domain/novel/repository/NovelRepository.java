@@ -43,8 +43,8 @@ public interface NovelRepository extends JpaRepository<Novel, Long>, CustomNovel
     List<String> findTagsByUserLikedEpisodes(@Param("userId") Long userId);
 
     // AI 추천 - 추천 후보 소설 (발행, 완결 상태 / 최신순 50개)
-    @Query("SELECT n FROM Novel n WHERE n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED') ORDER BY n.createdAt DESC LIMIT 50")
-    List<Novel> findTop50ForRecommendation();
+    @Query("SELECT n FROM Novel n WHERE n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED') ORDER BY n.createdAt DESC")
+    Page<Novel> findTop50ForRecommendation(Pageable pageable);
 
     // AI 추천 - 특정 장르 소설 (선호 장르용)
     @Query("SELECT n FROM Novel n WHERE n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED') AND n.genre = :genre ORDER BY n.viewCount DESC")
@@ -54,6 +54,11 @@ public interface NovelRepository extends JpaRepository<Novel, Long>, CustomNovel
     @Query("SELECT n FROM Novel n WHERE n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED') AND n.genre != :genre ORDER BY n.viewCount DESC")
     Page<Novel> findExcludeGenreForRecommendation(@Param("genre") String genre, Pageable pageable);
 
+    // AI 추천 - ID 목록으로 조회하되, 삭제되지 않고 공개된 소설만 조회 (랭킹 조회용)
+    @Query("SELECT n FROM Novel n WHERE n.id IN :novelIds AND n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED')")
+    List<Novel> findActiveNovelsByIds(@Param("novelIds") List<Long> novelIds);
+
     // AI 추천 - DB fallback
-    List<Novel> findTop10ByIsDeletedFalseOrderByViewCountDesc();
+    @Query("SELECT n FROM Novel n WHERE n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED') ORDER BY n.viewCount DESC")
+    Page<Novel> findFallbackNovels(Pageable pageable);
 }
