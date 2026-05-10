@@ -8,6 +8,9 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.context.annotation.Profile;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -33,6 +36,14 @@ public class OpenAiReviewClient implements AiReviewClient {
         this.objectMapper = objectMapper;
     }
 
+    @Retryable(
+            retryFor = RuntimeException.class,
+            maxAttempts = 3,
+            backoff = @Backoff(
+                    delay = 1000,
+                    multiplier = 2.0
+            )
+    )
     @Override
     public AiReviewResponse generate(Long episodeId, String title, String content) {
 
@@ -51,6 +62,12 @@ public class OpenAiReviewClient implements AiReviewClient {
         }
 
         return parseResponse(episodeId, json);
+    }
+
+    @Recover
+    public AiReviewResponse recover(RuntimeException e, Long episodeId, String title, String content) {
+        log.error("[AI 리뷰 최종 실패] episodeId={}, 3회 재시도 모두 실패", episodeId, e);
+        throw new IllegalStateException("AI 리뷰 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
     }
 
     private String buildPrompt(String title, String content) {

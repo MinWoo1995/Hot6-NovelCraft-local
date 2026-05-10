@@ -29,6 +29,10 @@ dependencies {
     // Spring AI - OpenAI (ChatClient + Embedding)
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 
+    // Spring Retry (OpenAI 폴백 처리)
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
