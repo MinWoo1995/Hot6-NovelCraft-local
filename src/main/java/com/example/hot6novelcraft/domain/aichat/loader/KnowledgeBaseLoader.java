@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.TextReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.io.Resource;
@@ -35,17 +36,24 @@ public class KnowledgeBaseLoader {
 
     /**
      * 앱 시작 시 FAQ 문서를 VectorStore에 적재한다.
-     * SimpleVectorStore는 인메모리이므로 재시작할 때마다 재적재가 필요하다.
+     * PgVectorStore는 영속 저장이므로 데이터가 이미 존재하면 재적재를 건너뛴다.
      */
     @PostConstruct
     public void load() {
+        List<Document> existing = vectorStore.similaritySearch(
+                SearchRequest.builder().query("NovelCraft FAQ").topK(1).build()
+        );
+        if (!existing.isEmpty()) {
+            log.info("FAQ 문서가 이미 VectorStore에 존재합니다. 적재를 건너뜁니다.");
+            return;
+        }
+
         log.info("FAQ 문서 VectorStore 적재 시작...");
 
         List<Document> allDocuments = FAQ_FILES.stream()
                 .flatMap(this::readDocument)
                 .toList();
 
-        // TokenTextSplitter: 토큰 단위로 청크 분할 (기본 800 토큰, 유사도 검색 정확도 향상)
         List<Document> chunks = new TokenTextSplitter().apply(allDocuments);
 
         vectorStore.add(chunks);
