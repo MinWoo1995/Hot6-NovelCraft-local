@@ -5,12 +5,7 @@ pipeline {
         DOCKER_IMAGE = 'jmw1995/novelcraft'
         DOCKER_TAG = "${BUILD_NUMBER}"
         APP_EC2_IP = '15.165.232.231'
-<<<<<<< HEAD:jenkinsfile
         FRONTEND_URL = 'https://43.200.129.27:8080'
-=======
-        FRONTEND_URL = 'http://43.200.129.27:8080'
-        REDIS_HOST = 'localhost'
->>>>>>> origin/main:Jenkinsfile
     }
 
     stages {
@@ -46,19 +41,11 @@ pipeline {
                     string(credentialsId: 'db-url',              variable: 'DB_URL'),
                     string(credentialsId: 'db-username',         variable: 'DB_USERNAME'),
                     string(credentialsId: 'db-password',         variable: 'DB_PASSWORD'),
-<<<<<<< HEAD:jenkinsfile
-                    // ===== AES 암호화 =====
                     string(credentialsId: 'aes-secret-key',      variable: 'AES_SECRET_KEY'),
                     string(credentialsId: 'aes-iv',              variable: 'AES_IV'),
-                    // ===== AWS S3 =====
                     string(credentialsId: 'aws-access-key',      variable: 'AWS_ACCESS_KEY'),
                     string(credentialsId: 'aws-secret-key',      variable: 'AWS_SECRET_KEY'),
                     string(credentialsId: 's3-bucket-name',      variable: 'S3_BUCKET_NAME'),
-                    // ===== OAuth2 =====
-=======
-                    string(credentialsId: 'aws-access-key',      variable: 'AWS_ACCESS_KEY'),
-                    string(credentialsId: 'aws-secret-key',      variable: 'AWS_SECRET_KEY'),
->>>>>>> origin/main:Jenkinsfile
                     string(credentialsId: 'google-client-id',    variable: 'GOOGLE_CLIENT_ID'),
                     string(credentialsId: 'google-client-secret', variable: 'GOOGLE_CLIENT_SECRET'),
                     string(credentialsId: 'kakao-client-id',     variable: 'KAKAO_CLIENT_ID'),
@@ -71,19 +58,13 @@ pipeline {
                     string(credentialsId: 'portone-webhook-secret',  variable: 'PORTONE_WEBHOOK_SECRET'),
                     string(credentialsId: 'coolsms-api-key',     variable: 'COOLSMS_API_KEY'),
                     string(credentialsId: 'coolsms-secret-key',  variable: 'COOLSMS_SECRET_KEY'),
-<<<<<<< HEAD:jenkinsfile
-                    // ===== 국립도서관 =====
                     string(credentialsId: 'library-api-key',     variable: 'LIBRARY_API_KEY'),
-                    // ===== AI =====
                     string(credentialsId: 'openai-api-key',      variable: 'OPENAI_API_KEY'),
                     string(credentialsId: 'gemini-api-key',      variable: 'GEMINI_API_KEY'),
-                    // ===== PGVector =====
                     string(credentialsId: 'pgvector-url',        variable: 'PGVECTOR_URL'),
                     string(credentialsId: 'pgvector-username',   variable: 'PGVECTOR_USERNAME'),
                     string(credentialsId: 'pgvector-password',   variable: 'PGVECTOR_PASSWORD'),
-                    // ===== Kafka =====
                     string(credentialsId: 'kafka-bootstrap-servers', variable: 'KAFKA_BOOTSTRAP_SERVERS'),
-                    // ===== Redis Sentinel =====
                     string(credentialsId: 'redis-sentinel-nodes',  variable: 'REDIS_SENTINEL_NODES'),
                 ]) {
                     sshagent(['app-ec2-ssh-key']) {
@@ -95,16 +76,6 @@ pipeline {
 
                                 docker pull ${DOCKER_IMAGE}:latest
 
-=======
-                    string(credentialsId: 'library-api-key',     variable: 'LIBRARY_API_KEY')
-                ]) {
-                    sshagent(['app-ec2-ssh-key']) {
-                        sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@${APP_EC2_IP} '
-                                docker stop novelcraft || true
-                                docker rm novelcraft || true
-                                docker pull ${DOCKER_IMAGE}:latest
->>>>>>> origin/main:Jenkinsfile
                                 docker run -d \\
                                     --name novelcraft \\
                                     --network host \\
@@ -141,12 +112,9 @@ pipeline {
                                     -e REDIS_SENTINEL_NODES=${REDIS_SENTINEL_NODES} \\
                                     --restart always \\
                                     ${DOCKER_IMAGE}:latest
-<<<<<<< HEAD:jenkinsfile
 
-=======
->>>>>>> origin/main:Jenkinsfile
                                 docker image prune -f
-                            '
+ENDSSH
                         """
                     }
                 }
