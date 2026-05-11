@@ -18,7 +18,7 @@ spring:
     redis:
       sentinel:
         master: ${REDIS_SENTINEL_MASTER:mymaster}
-        nodes: ${REDIS_SENTINEL_NODES:127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381}
+        nodes: ${REDIS_SENTINEL_NODES}
       lettuce:
         pool:
           max-active: 10
@@ -63,7 +63,7 @@ spring:
       write-dates-as-timestamps: false
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
       group-id: notification-service
 
@@ -149,9 +149,9 @@ cover:
 
 pgvector:
   datasource:
-    url: ${PGVECTOR_URL:jdbc:postgresql://localhost:5432/novelcraft_vectors}
-    username: ${PGVECTOR_USERNAME:postgres}
-    password: ${PGVECTOR_PASSWORD:postgres}
+    url: ${PGVECTOR_URL}
+    username: ${PGVECTOR_USERNAME}
+    password: ${PGVECTOR_PASSWORD}
 
 ai:
   chat:
