@@ -8,7 +8,6 @@ encryption:
 
 spring:
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
 
   ai:
     openai:
