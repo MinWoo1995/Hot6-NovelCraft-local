@@ -7,7 +7,9 @@ encryption:
     iv: ${AES_IV}                   # 반드시 16자리
 
 spring:
-  profiles:
+  config:
+    activate:
+      on-profile: prod
 
   ai:
     openai:
