@@ -23,6 +23,8 @@ dependencies {
     implementation 'com.openai:openai-java:2.1.0'
     // Google Gemini SDK
     implementation 'com.google.genai:google-genai:1.0.0'
+    // Actuator + Prometheus
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 
     // Spring AI BOM
     implementation platform('org.springframework.ai:spring-ai-bom:1.0.0')
