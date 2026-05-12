@@ -5,7 +5,7 @@ pipeline {
         DOCKER_IMAGE = 'jmw1995/novelcraft'
         DOCKER_TAG = "${BUILD_NUMBER}"
         APP_EC2_IP = '43.202.163.88'
-        FRONTEND_URL = 'https://43.200.129.27:8080'
+        FRONTEND_URL = 'https://43.202.163.88:8080'
     }
 
     stages {
@@ -68,6 +68,8 @@ pipeline {
                     string(credentialsId: 'redis-sentinel-nodes',  variable: 'REDIS_SENTINEL_NODES'),
                 ]) {
                     sshagent(['app-ec2-ssh-key']) {
+                        sh "ssh -o StrictHostKeyChecking=no ec2-user@${APP_EC2_IP} 'mkdir -p ~/monitoring ~/init'"
+
                         sh """
                             # 파일 전송
                             scp -o StrictHostKeyChecking=no docker-compose.yml ec2-user@${APP_EC2_IP}:~/
@@ -77,7 +79,9 @@ pipeline {
                             ssh -o StrictHostKeyChecking=no ec2-user@${APP_EC2_IP} << 'ENDSSH'
 
                                 # 인프라 실행 (모니터링 제외)
-                                docker-compose up -d redis-master redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 kafka-1 postgres-vector                                docker stop novelcraft || true
+                                docker-compose up -d redis-master redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 kafka-1 postgres-vector
+
+                                docker stop novelcraft || true
                                 docker rm novelcraft || true
 
                                 docker pull ${DOCKER_IMAGE}:latest
